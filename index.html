@@ -1,0 +1,1431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DigitDesk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: setup and order | live ticks, frequency, AI lab | session and results. Fits one screen on wide displays; stacks on phones */
+:root{
+  --bg:#eef2f1; --surface:#ffffff; --surface-2:#e5ebe9; --fg:#13201e; --muted:#5b6b68; --line:#d2dbd8;
+  --accent:#0e7c70; --accent-fg:#ffffff;
+  --win:#15803d; --win-bg:#dcfce7; --loss:#b91c1c; --loss-bg:#fee2e2; --warn:#92400e; --warn-bg:#fef3c7; --cursor:#ea580c;
+  --sans:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0c1211; --surface:#141c1b; --surface-2:#1c2625; --fg:#e2eae8; --muted:#8fa19d; --line:#27332f;
+    --accent:#2bb3a3; --accent-fg:#06201d;
+    --win:#4ade80; --win-bg:#123020; --loss:#f87171; --loss-bg:#3a1515; --warn:#fbbf24; --warn-bg:#3a2d0a; --cursor:#fb923c;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--sans)}
+.wrap{max-width:1500px;margin:0 auto;padding:16px 16px 32px;display:grid;gap:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--surface-2);font-size:13px;font-family:var(--mono)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.on .dot{background:var(--win)}
+.pill.warn .dot{background:var(--cursor)}
+.hdr-right{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.hdr-right button{padding:6px 12px;font-size:13px}
+.cloudbox{display:grid;gap:10px;position:fixed;top:56px;right:16px;z-index:50;width:min(520px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.cloudbox .row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.cloudbox .field{flex:1 1 180px}
+.repsrc{display:flex;gap:8px;align-items:center}
+.repsrc select{padding:5px 8px;font-size:13px}
+.tag{padding:1px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--sans);text-transform:uppercase;letter-spacing:.05em}
+.tag.demo{background:var(--win-bg);color:var(--win)}
+.tag.real{background:var(--loss-bg);color:var(--loss)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.connect{display:grid;gap:12px}
+.connect .row{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+.field{display:grid;gap:4px;min-width:0}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+input,select{font:inherit;font-family:var(--mono);font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.f-app{width:110px}.f-token{flex:1 1 260px}
+button{font:inherit;font-weight:600;border:0;border-radius:6px;padding:10px 16px;cursor:pointer;background:var(--surface-2);color:var(--fg)}
+button.primary{background:var(--accent);color:var(--accent-fg)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.hint{font-size:13px;color:var(--muted);margin:0;max-width:72ch}
+.banner{padding:10px 12px;border-radius:6px;font-size:14px;display:grid;gap:6px}
+.banner.warn{background:var(--warn-bg);color:var(--warn)}
+.banner label{display:flex;gap:8px;align-items:center;font-weight:600}
+.banner input{width:auto}
+.scan{border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:8px;font-size:14px}
+.scan .verdict{font-weight:600}
+.scan ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.scan li{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-family:var(--mono);font-size:13px}
+/* three working columns: setup | market + lab | session + results */
+.layout{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+.left{display:grid;gap:12px;min-width:0}
+.col{display:grid;gap:12px;align-content:start;min-width:0;grid-template-columns:minmax(0,1fr)}
+.col>*{min-width:0}
+th{white-space:nowrap}
+.results td{padding:6px 6px;font-size:12px}.results th{padding:6px 6px}
+.splitter{display:none;cursor:col-resize;position:relative;touch-action:none}
+.splitter::before{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;border-radius:2px;background:var(--line);transition:background .15s}
+.splitter:hover::before,.splitter.drag::before{background:var(--cursor)}
+.splitter::after{content:"⋮";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted);font-size:14px;background:var(--bg);padding:4px 0;pointer-events:none}
+body.resizing{cursor:col-resize;user-select:none}
+.col::-webkit-scrollbar{width:8px}.col::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}.col::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+.rowswrap th{position:sticky;top:0;background:var(--surface);z-index:1}
+@media (min-width:900px){
+  .layout{grid-template-columns:minmax(0,1.6fr) minmax(340px,1fr);align-items:start}
+  .colC{position:sticky;top:8px}
+}
+@media (min-width:1180px){
+  html,body{height:100%}
+  .wrap{height:100%;max-width:none;padding-block:12px;grid-template-rows:auto minmax(0,1fr);gap:10px}
+  .layout{grid-template-columns:minmax(0,1fr) 10px var(--wC,420px);gap:0;height:100%;min-height:0;align-items:stretch}
+  .left{grid-template-columns:var(--wA,300px) 10px minmax(0,1fr);gap:0;min-height:0}
+  .col{overflow-y:auto;overflow-x:hidden;min-height:0;padding-right:4px;scrollbar-width:thin}
+  .splitter{display:block}
+  .colC{position:static;display:flex;flex-direction:column}
+  .results{flex:1 1 auto;min-height:260px;display:flex;flex-direction:column}
+  #byBrainWrap{flex:0 0 auto}
+  .rowswrap{flex:1 1 auto;min-height:0;overflow:auto}
+  .card{padding:12px 14px}
+  .connect .row .field{flex:1 1 100%}
+  .f-app{width:auto}
+  .connect .row button{padding:8px 10px;flex:1 1 0;font-size:14px}
+  .order{gap:10px}
+  .lab td,.lab th{padding:6px 5px}
+  .lab td{font-size:12px}
+}
+.order{display:grid;gap:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.summary{background:var(--surface-2);border-radius:8px;padding:12px;font-size:14px;display:grid;gap:4px}
+.summary strong{font-family:var(--mono)}
+.buy{font-size:16px;padding:14px}
+.buywhy{margin:-4px 0 0;font-size:13px;color:var(--warn);background:var(--warn-bg);padding:6px 10px;border-radius:6px}
+.msg{font-size:14px;min-height:1.5em;margin:0}
+.msg.err{color:var(--loss)}.msg.ok{color:var(--win)}
+.side{display:grid;gap:16px;min-width:0}
+.live{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.bigdigit{width:72px;height:72px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;font:600 40px var(--mono);color:var(--cursor);box-shadow:inset 0 0 0 2px var(--cursor)}
+.price{font:600 20px var(--mono)}
+.sym{font-size:13px;color:var(--muted)}
+.strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.strip span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:12px var(--mono);background:var(--surface-2)}
+.strip span:last-child{outline:2px solid var(--accent)}
+.strip span.clicked{outline:2px dashed var(--fg);outline-offset:1px}
+.strip span.won{background:var(--win);color:var(--surface);font-weight:600}
+.strip span.lost{background:var(--loss);color:var(--surface);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;margin-right:4px}
+.freqhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.freqhead h2{margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:2px;background:var(--surface-2);border-radius:6px;padding:2px}
+.seg button{padding:4px 9px;font-size:12px;font-family:var(--mono);background:transparent;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);font-weight:600}
+.freq{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+@media (max-width:520px){.freq{grid-template-columns:repeat(5,minmax(0,1fr));row-gap:12px}}
+.dg{display:grid;justify-items:center;gap:4px}
+.ring{--p:0;--ring:var(--muted);width:100%;max-width:48px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--ring) calc(var(--p)*1%),var(--surface-2) 0)}
+.ring span{width:76%;height:76%;border-radius:50%;background:var(--surface);display:grid;place-items:center;font:600 15px var(--mono)}
+.dg.hi .ring{--ring:var(--win)}.dg.lo .ring{--ring:var(--loss)}
+.dg.now .ring span{outline:3px solid var(--cursor);outline-offset:1px;color:var(--cursor)}
+.freqwrap{position:relative;padding-top:16px}
+.cursor{position:absolute;top:0;left:0;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid var(--cursor);transform:translateX(-50%);transition:left .25s ease,top .25s ease;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+.strip span:last-child{outline:3px solid var(--cursor)!important;outline-offset:1px}
+@media (prefers-reduced-motion: reduce){.cursor{transition:none}}
+.dg .pct{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.dg.hi .pct{color:var(--win)}.dg.lo .pct{color:var(--loss)}
+.freqnote{font-size:12px;color:var(--muted);margin:10px 0 0}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr}.tabs button{padding:8px;font-size:14px;font-family:var(--sans)}
+.apstate{font:600 12px var(--sans);padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.apstate.run{background:var(--win-bg);color:var(--win)}.apstate.pause{background:var(--warn-bg);color:var(--warn)}.apstate.stopped{background:var(--loss-bg);color:var(--loss)}
+.budget{display:grid;gap:4px;margin-bottom:10px}
+.bar{height:10px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s,background .3s}
+.budgettext{font:12px var(--mono);color:var(--muted)}
+.apgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.apgrid .field{align-content:end}
+.apgrid .field label{font-size:11px;line-height:1.3}
+.apgrid input{padding:7px 8px;font-size:13px}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg);font-weight:500}
+.chk input{width:auto;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:4px 14px}
+.apbtns{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-top:10px}
+.apbtns button{padding:9px 6px;font-size:14px}
+button.stop{background:var(--loss);color:var(--surface)}
+.apstats{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:10px;font:12px var(--mono);color:var(--muted)}
+.apstats b{color:var(--fg)}
+.apsummary{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--surface-2);font-size:13px;display:grid;gap:2px}
+.apsummary b{font-family:var(--mono)}
+.aptoday{margin-top:8px;font:12px var(--mono);color:var(--muted)}
+.aptoday b{color:var(--fg)}
+.fbrule{display:grid;gap:4px;font-size:13px;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.fblive{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.fblive div{display:grid;gap:2px}.fblive .k{font-size:11px;color:var(--muted)}.fblive .v{font:600 16px var(--mono)}
+.fbwhy{font-size:11px;color:var(--muted)}
+.fblive .v.red{color:var(--loss)}.fblive .v.hot{color:var(--cursor)}
+.apnotes{margin-top:8px;max-height:180px;overflow-y:auto;border-top:1px solid var(--line);padding-top:6px;display:grid;gap:4px}
+.apnotes div{font-size:12px;line-height:1.4}
+.apnotes time{font-family:var(--mono);color:var(--muted);margin-right:6px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.split{margin-top:8px;font:12px var(--mono);color:var(--muted)}.split b{color:var(--fg)}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font:600 18px var(--mono);font-variant-numeric:tabular-nums}
+.pos{color:var(--win)}.neg{color:var(--loss)}
+.stopline{margin-top:12px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;font-size:14px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);white-space:nowrap}
+tr.newround td{border-top:2px solid var(--line)}
+.st{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--sans)}
+.st.won{background:var(--win-bg);color:var(--win)}.st.lost{background:var(--loss-bg);color:var(--loss)}.st.open{background:var(--surface-2);color:var(--muted)}
+.empty{color:var(--muted);font-family:var(--sans);padding:16px 8px}
+.foot{font-size:13px;color:var(--muted);max-width:80ch;margin:0}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DigitDesk</h1>
+    <div class="hdr-right">
+      <div class="pill" id="cloudPill" title="Your DigitDesk cloud account (Supabase). Saves trades and the daily loss limit. Your Deriv token is never sent here."><span class="dot"></span><span id="cloudText">Cloud: signed out</span></div>
+      <button id="cloudBtn">Sign in</button>
+      <div class="pill" id="status"><span class="dot"></span><span id="statusText">Not connected</span></div>
+    </div>
+  </header>
+  <section class="card cloudbox" id="cloudBox" hidden>
+    <h2 style="margin:0">DigitDesk cloud account</h2>
+    <p class="hint" style="margin:0">This is a separate login for DigitDesk, not your Deriv login. Signed in, every settled trade and your Autopilot daily loss limit are saved, and you can analyse stored tick history. Your Deriv token is never saved.</p>
+    <div class="row">
+      <div class="field"><label for="cloudEmail">Email</label><input id="cloudEmail" type="email" autocomplete="email"></div>
+      <div class="field"><label for="cloudPass">Password</label><input id="cloudPass" type="password" autocomplete="current-password" placeholder="At least 8 characters"></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="cloudIn">Sign in</button>
+      <button id="cloudUp">Create account</button>
+      <button id="cloudClose">Close</button>
+    </div>
+    <div class="msg" id="cloudMsg"></div>
+  </section>
+
+  <main class="layout">
+    <div class="left">
+      <div class="col colA">
+  <section class="card connect">
+    <div class="row">
+      <div class="field f-app"><label for="appId">App ID</label><input id="appId" autocomplete="off" placeholder="From dashboard"></div>
+      <div class="field f-token"><label for="token">Deriv API token</label><input id="token" type="password" autocomplete="off" placeholder="Paste your pat_… token"></div>
+      <button id="checkBtn" title="Check whether the token reaches demo or real accounts">Check</button>
+      <button class="primary" id="connectBtn">Connect</button>
+      <button id="disconnectBtn" disabled>Disconnect</button>
+    </div>
+    <div class="scan" id="scan" hidden></div>
+    <div class="field" id="accountField" hidden><label for="account">Trading account</label><select id="account"></select></div>
+    <p class="hint" id="connectHint">Get an App ID by registering an app (Personal access token type) on the Dashboard at developers.deriv.com. Create the token with only the <b>Trade</b> permission. The token is cleared from the box after you connect and is never saved, not even in the cloud. Paste it again each time you open the page.</p>
+    <div class="banner warn" id="realWarn" hidden>
+      <span>This token belongs to a <b>real-money</b> account. Every round below uses real money.</span>
+      <label><input type="checkbox" id="realOk"> I understand and want to trade real money</label>
+    </div>
+  </section>
+      <div class="seg tabs" role="tablist"><button id="tabManual" aria-pressed="true">Manual</button><button id="tabAuto" aria-pressed="false">Autopilot</button><button id="tabFixed" aria-pressed="false">AI Fixed Bet</button></div>
+      <section class="card order">
+      <h2>Order</h2>
+      <div class="field"><label for="symbol">Market</label><select id="symbol"></select></div>
+      <div class="two">
+        <div class="field"><label for="kind">Contract</label>
+          <select id="kind">
+            <option value="over" selected>Over</option><option value="under">Under</option>
+            <option value="even">Even</option><option value="odd">Odd</option>
+            <option value="match">Matches</option><option value="differ">Differs</option>
+            <option value="runhigh">Only Ups</option><option value="runlow">Only Downs</option>
+            <option value="runalt">Only Ups / Downs (alternate)</option>
+          </select></div>
+        <div class="field" id="digitField"><label for="digit">Digit</label><input id="digit" type="number" min="0" max="9" value="1"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="stake">Stake per contract</label><input id="stake" type="number" min="0.35" step="0.01" value="1"></div>
+        <div class="field"><label for="count">Contracts per round</label><input id="count" type="number" min="1" max="10" value="3"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="ticks">Ticks</label><input id="ticks" type="number" min="1" max="10" value="1"></div>
+        <div class="field"><label for="tp">Take profit</label><input id="tp" type="number" min="0.01" step="0.01" value="3"></div>
+      </div>
+      <div class="field"><label for="sl">Stop loss</label><input id="sl" type="number" min="0.35" step="0.01" value="5"></div>
+      <div class="summary" id="summary"></div>
+      <button class="primary buy" id="buyBtn" disabled>Buy round</button>
+      <p class="buywhy" id="buyWhy" hidden></p>
+      <p class="msg" id="msg" role="status"></p>
+      </section>
+        <section class="card" id="fbCard" hidden>
+          <div class="freqhead"><h2>AI Fixed Bet</h2><span class="apstate" id="fbState">Off</span></div>
+          <div class="field" style="margin-bottom:10px"><label for="fbSymbol">Market</label><select id="fbSymbol" class="mktsel"></select></div>
+          <div class="field" style="margin-bottom:10px"><label>Bets to place</label>
+            <div class="seg tabs" id="fbModeSeg" role="group" aria-label="Bets to place"><button data-m="both" aria-pressed="true">Auto</button><button data-m="over" aria-pressed="false">Over 0 only</button><button data-m="under" aria-pressed="false">Under 9 only</button></div>
+          </div>
+          <div class="fbrule"><div id="fbRuleText"></div><div>A digit is only traded while its frequency is <b>10.0% or below</b> (blocked at 10.1%+) and it is <b>not the green ring</b>. Each digit is judged on its own.</div></div>
+          <div class="fblive">
+            <div><span class="k">Digit 0</span><span class="v" id="fbD0">–</span><span class="fbwhy" id="fbW0"></span></div>
+            <div><span class="k">Digit 9</span><span class="v" id="fbD9">–</span><span class="fbwhy" id="fbW9"></span></div>
+            <div><span class="k">Green ring · buys on</span><span class="v" id="fbWait">–</span><span class="fbwhy" id="fbG"></span></div>
+          </div>
+          <div class="apgrid">
+            <div class="field"><label for="fbStake">Stake per contract</label><input id="fbStake" type="number" min="0.35" step="0.05" value="1"></div>
+            <div class="field"><label for="fbCount">Contracts per round</label><input id="fbCount" type="number" min="1" max="10" value="6"></div>
+            <div class="field"><label for="fbTP">Take profit</label><input id="fbTP" type="number" min="0.1" step="0.5" value="4"></div>
+            <div class="field"><label for="fbSL">Stop loss</label><input id="fbSL" type="number" min="0.35" step="0.5" value="6"></div>
+          </div>
+          <p class="hint" style="margin-top:6px">1 tick per contract. Uses the Digit frequency window you've selected (currently <b id="fbN">1000</b> ticks). Demo account only.</p>
+          <div class="apbtns" style="grid-template-columns:2fr 1fr"><button class="primary" id="fbStart">Start AI Fixed Bet</button><button class="stop" id="fbStop" disabled>STOP</button></div>
+          <p class="msg" id="fbMsg" role="status"></p>
+          <div class="apstats" id="fbStats"></div>
+        </section>
+        <section class="card" id="apCard" hidden>
+          <div class="freqhead"><h2>Autopilot</h2><span class="apstate" id="apState">Off</span></div>
+          <p class="hint" style="margin-bottom:10px">Picks the best-scoring AI lab brain and trades it for you, inside the limits below. The page enforces every limit; Autopilot can only stop earlier, never go further.</p>
+          <div class="field" style="margin-bottom:10px"><label for="apSymbol">Market</label><select id="apSymbol" class="mktsel"></select></div>
+          <div class="budget"><div class="bar"><i id="apBar"></i></div><div class="budgettext" id="apBudgetText">Budget not started</div></div>
+          <div class="apgrid">
+            <div class="field"><label for="apBudget">Session budget (max loss)</label><input id="apBudget" type="number" min="0.35" step="0.5" value="5"></div>
+            <div class="field"><label for="apTarget">Profit target</label><input id="apTarget" type="number" min="0.1" step="0.5" value="3"></div>
+            <div class="field"><label for="apStake">Max stake per contract</label><input id="apStake" type="number" min="0.35" step="0.05" value="1"></div>
+            <div class="field"><label for="apRound">Max per round</label><input id="apRound" type="number" min="0.35" step="0.5" value="1"></div>
+            <div class="field"><label for="apStreak">Pause after losses in a row</label><input id="apStreak" type="number" min="1" max="20" value="3"></div>
+            <div class="field"><label for="apCool">Pause length (seconds)</label><input id="apCool" type="number" min="10" step="10" value="120"></div>
+            <div class="field"><label for="apMaxTrades">Max rounds</label><input id="apMaxTrades" type="number" min="1" value="100"></div>
+            <div class="field"><label for="apMaxMin">Max minutes</label><input id="apMaxMin" type="number" min="1" value="30"></div>
+            <div class="field"><label for="apMinPred">Brain must have tried at least</label><input id="apMinPred" type="number" min="100" step="100" value="500"></div>
+            <div class="field"><label for="apProtectAt">Protect winnings once up</label><input id="apProtectAt" type="number" min="0" step="0.5" value="3"></div>
+            <div class="field"><label for="apFloor">…never drop below</label><input id="apFloor" type="number" step="0.5" value="1"></div>
+            <div class="field"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="apProtect" checked> Protect on</label></div>
+            <div class="field"><label for="apDaily">Daily loss limit (all sessions)</label><input id="apDaily" type="number" min="0.35" step="1" value="10"></div>
+            <div class="field"><label for="apLock">Lock after budget stop (minutes)</label><input id="apLock" type="number" min="0" step="5" value="30"></div>
+          </div>
+          <div class="field" style="margin-top:4px"><label>Allowed bets</label>
+            <div class="chips"><label class="chk"><input type="checkbox" id="apAllowMatch" checked> Matches</label><label class="chk"><input type="checkbox" id="apAllowOU" checked> Over / Under</label><label class="chk"><input type="checkbox" id="apAllowEO" checked> Even / Odd</label></div>
+          </div>
+          <label class="chk" style="margin-top:6px"><input type="checkbox" id="apNoChase" checked disabled> Never raise the stake after a loss (always on)</label>
+          <label class="chk" title="Only trade a brain whose hit rate is clearly above chance (2.5 standard deviations), not just slightly ahead by luck"><input type="checkbox" id="apStrict"> Strict: only trade brains clearly above chance</label>
+          <label class="chk"><input type="checkbox" id="apReal"> Allow real money (caps: $1 stake, $3 budget)</label>
+          <div class="apbtns"><button class="primary" id="apStart">Start Autopilot</button><button id="apPause" disabled>Pause</button><button class="stop" id="apStop" disabled>STOP</button></div>
+          <p class="msg" id="apMsg" role="status"></p>
+          <div class="apstats" id="apStats"></div>
+          <div class="apsummary" id="apSummary" hidden></div>
+          <div class="aptoday" id="apToday"></div>
+          <div class="apnotes" id="apNotes"><div class="hint">Autopilot's notes appear here.</div></div>
+        </section>
+        <p class="foot">Contracts bought in the same round are settled by the same tick, so they win or lose together. A round of 3 × $1 is the same bet as one $3 contract. Digits on synthetic indices are random and payouts are set below fair odds, so expect a small loss per round on average. Test on demo first.</p>
+      </div>
+      <div class="splitter" id="splitA" title="Drag to resize. Double-click to reset." role="separator" aria-orientation="vertical"></div>
+      <div class="col colB">
+      <section class="card">
+        <h2>Live ticks</h2>
+        <div class="live">
+          <div class="bigdigit" id="lastDigit">–</div>
+          <div style="min-width:0">
+            <div class="price" id="price">—</div>
+            <div class="sym" id="symName">Connect to see live prices</div>
+            <div class="strip" id="strip"></div>
+            <div class="legend"><span><i style="outline:2px dashed var(--fg);outline-offset:-2px"></i>You pressed Buy</span><span><i style="background:var(--win)"></i><i style="background:var(--loss)"></i>Tick that settled your trade</span></div>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="freqhead">
+          <h2>Digit frequency</h2>
+          <div class="seg" id="seg" role="group" aria-label="Number of ticks">
+            <button data-n="25">25</button><button data-n="50">50</button><button data-n="100">100</button><button data-n="250">250</button><button data-n="500">500</button><button data-n="1000" aria-pressed="true">1000</button>
+          </div>
+        </div>
+        <div class="freqwrap"><div class="cursor" id="cursor" hidden></div><div class="freq" id="freq"></div></div>
+        <p class="freqnote" id="freqNote">Connect to load recent ticks.</p>
+      </section>
+      <section class="card">
+        <div class="freqhead">
+          <h2>AI test lab</h2>
+          <div class="seg" id="labSeg" role="group" aria-label="Ticks the brains learn from">
+            <button data-n="100">100</button><button data-n="250">250</button><button data-n="500">500</button><button data-n="1000" aria-pressed="true">1000</button>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px">Each brain studies the last <b id="labNlbl">1000</b> ticks and predicts the next one. Paper only, scored at $1 each. Hover a brain's name to see how it picks.</p>
+        <div class="tablewrap">
+          <table class="lab">
+            <thead><tr><th>Brain</th><th>Next pick</th><th>Tried</th><th title="Hit rate, with the chance rate in brackets">Hit (chance)</th><th>Paper P/L</th><th>Verdict</th><th></th></tr></thead>
+            <tbody id="labRows"></tbody>
+          </table>
+        </div>
+        <div class="stopline"><span id="labStatus" class="hint">Connect to start the brains.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button id="labCsv">Download CSV</button><button id="labReset">Reset lab</button></span></div>
+        <p class="freqnote" id="payNote"></p>
+      </section>
+
+      <section class="card">
+        <div class="freqhead"><h2>Repeats</h2><div class="repsrc"><select id="repSrc" title="Count live ticks from this session, or the hourly history saved in the cloud (Vol 10 (1s) and Vol 100 (1s) only; sign in first)"><option value="live">Live ticks</option><option value="6">Stored · last 6 h</option><option value="24">Stored · last 24 h</option><option value="72">Stored · last 3 days</option><option value="168">Stored · last 7 days</option></select><button id="ticksCsv" style="padding:6px 12px;font-size:13px">Download ticks CSV</button></div></div>
+        <p class="hint" style="margin-bottom:8px"><span id="repWhat">Counts doubles and triples in every tick collected on this market</span> (<b id="repN">0</b> ticks). "After 0 → 0" is exactly when an Over 0 bought on a 0 would lose; "After 9 → 9" is when an Under 9 bought on a 9 would lose.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Pattern</th><th>Seen</th><th>Out of</th><th>Rate (chance)</th><th>Verdict</th></tr></thead>
+            <tbody id="repRows"></tbody>
+          </table>
+        </div>
+        <div class="apstats" id="repGaps"></div>
+      </section>
+      </div>
+    </div>
+    <div class="splitter" id="splitC" title="Drag to resize. Double-click to reset." role="separator" aria-orientation="vertical"></div>
+    <div class="col colC">
+      <section class="card">
+        <h2>This session</h2>
+        <div class="stats">
+          <div class="stat"><div class="k">Profit / loss</div><div class="v" id="sPnl">$0.00</div></div>
+          <div class="stat"><div class="k">Rounds</div><div class="v" id="sRounds">0</div></div>
+          <div class="stat"><div class="k">Contracts won / lost</div><div class="v" id="sWL">0 / 0</div></div>
+          <div class="stat"><div class="k">Win rate</div><div class="v" id="sRate">–</div></div>
+          <div class="stat"><div class="k">Longest losing run</div><div class="v" id="sStreak">0 rounds</div></div>
+          <div class="stat"><div class="k">Balance</div><div class="v" id="sBal">–</div></div>
+        </div>
+        <div class="split" id="sSplit">Manual <b>$0.00</b> · Autopilot <b>$0.00</b>
+        </div>
+        <div class="stopline"><span id="stopText">Trading open</span><button id="resetBtn">Reset session</button></div>
+      </section>
+      <section class="card results">
+        <div class="freqhead"><h2>Results</h2><button id="tradesCsv" style="padding:6px 12px;font-size:13px">Download CSV</button></div>
+        <div class="tablewrap" id="byBrainWrap" hidden style="margin-bottom:14px">
+          <table>
+            <thead><tr><th>By brain</th><th>Trades</th><th>Won / lost</th><th>Win rate</th><th>Profit / loss</th></tr></thead>
+            <tbody id="byBrain"></tbody>
+          </table>
+        </div>
+        <div class="tablewrap rowswrap">
+          <table>
+            <thead><tr><th>Rnd</th><th>Time</th><th>Brain</th><th>Contract</th><th>Stake → pays</th><th>Exit</th><th>P/L</th></tr></thead>
+            <tbody id="rows"><tr><td colspan="7" class="empty">Results appear here after your first round.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const SYMBOLS = [
+  ['R_10','Volatility 10 Index'],['R_25','Volatility 25 Index'],['R_50','Volatility 50 Index'],
+  ['R_75','Volatility 75 Index'],['R_100','Volatility 100 Index'],
+  ['1HZ10V','Volatility 10 (1s) Index'],['1HZ25V','Volatility 25 (1s) Index'],['1HZ30V','Volatility 30 (1s) Index'],
+  ['1HZ50V','Volatility 50 (1s) Index'],['1HZ75V','Volatility 75 (1s) Index'],['1HZ90V','Volatility 90 (1s) Index'],['1HZ100V','Volatility 100 (1s) Index']
+];
+const KINDS = {
+  over:{type:'DIGITOVER',label:'Over',digit:true,min:0,max:8},
+  under:{type:'DIGITUNDER',label:'Under',digit:true,min:1,max:9},
+  even:{type:'DIGITEVEN',label:'Even',digit:false},
+  odd:{type:'DIGITODD',label:'Odd',digit:false},
+  match:{type:'DIGITMATCH',label:'Matches',digit:true,min:0,max:9},
+  differ:{type:'DIGITDIFF',label:'Differs',digit:true,min:0,max:9},
+  runhigh:{type:'RUNHIGH',label:'Only Ups',digit:false,run:true},
+  runlow:{type:'RUNLOW',label:'Only Downs',digit:false,run:true},
+  runalt:{type:null,label:'Only Ups / Downs',digit:false,run:true}
+};
+let altUp=true;
+['symbol','apSymbol','fbSymbol'].forEach(id=>SYMBOLS.forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;if(v==='1HZ30V')o.selected=true;$(id).appendChild(o);}));
+
+let ws=null, seq=0, pending=new Map(), account=null, pingTimer=null;
+let session, contracts, orphans, rounds, roundSeq, roundOpen, digits;
+function resetSession(){
+  session={pnl:0,manualPnl:0,apPnl:0,fbPnl:0,rounds:0,won:0,lost:0,streak:0,maxStreak:0,stopped:null};
+  contracts=new Map(); orphans=new Map(); rounds=new Map(); roundSeq=0; roundOpen=false;
+  renderStats(); renderRows(); updateBuy();
+}
+digits=[];
+
+const cur = () => (account && account.currency) || 'USD';
+function money(x, signed){
+  const sym = cur()==='USD' ? '$' : cur()+' ';
+  const s = sym + Math.abs(x).toFixed(2);
+  if(x<0) return '−'+s;
+  return signed && x>0 ? '+'+s : s;
+}
+function num(id){ return parseFloat($(id).value); }
+function showMsg(t,cls){ const m=$('msg'); m.textContent=t||''; m.className='msg'+(cls?' '+cls:''); }
+
+function winInfo(kind,d,ticks){
+  switch(kind){
+    case 'runhigh': return {txt:`every tick rising for ${ticks} ticks`, p:Math.pow(.5,ticks)};
+    case 'runlow': return {txt:`every tick falling for ${ticks} ticks`, p:Math.pow(.5,ticks)};
+    case 'runalt': return {txt:`${ticks} ticks in a row in the round's direction (alternates up, down)`, p:Math.pow(.5,ticks)};
+    case 'over': return {txt: d+1===9?'9':`${d+1}–9`, p:(9-d)/10};
+    case 'under': return {txt: d-1===0?'0':`0–${d-1}`, p:d/10};
+    case 'even': return {txt:'0, 2, 4, 6, 8', p:.5};
+    case 'odd': return {txt:'1, 3, 5, 7, 9', p:.5};
+    case 'match': return {txt:String(d), p:.1};
+    default: return {txt:`anything except ${d}`, p:.9};
+  }
+}
+function readOrder(){
+  const kind=$('kind').value, k=KINDS[kind];
+  const o={kind,k,digit:parseInt($('digit').value,10),stake:num('stake'),count:parseInt($('count').value,10),
+    ticks:parseInt($('ticks').value,10),tp:num('tp'),sl:num('sl'),symbol:$('symbol').value};
+  let err=null;
+  if(k.digit && (isNaN(o.digit)||o.digit<k.min||o.digit>k.max)) err=`For ${k.label}, choose a digit from ${k.min} to ${k.max}.`;
+  else if(!(o.stake>=0.35)) err='The minimum stake is 0.35.';
+  else if(!(o.count>=1&&o.count<=10)) err='Choose 1 to 10 contracts per round.';
+  else if(k.run&&!(o.ticks>=2&&o.ticks<=5)) err='Only Ups / Only Downs lasts 2 to 5 ticks.';
+  else if(!k.run&&!(o.ticks>=1&&o.ticks<=10)) err='Digit contracts last 1 to 10 ticks.';
+  else if(!(o.tp>0)) err='Set a take profit above 0.';
+  else if(!(o.sl>=0.35)) err='Set a stop loss of at least 0.35.';
+  o.err=err; o.label=k.label+(k.digit?' '+o.digit:'');
+  return o;
+}
+function renderSummary(){
+  const o=readOrder();
+  $('digitField').hidden=!o.k.digit;
+  if(o.err){ $('summary').innerHTML=`<span class="neg">${o.err}</span>`; updateBuy(); return; }
+  const w=winInfo(o.kind,o.digit,o.ticks), risk=o.count*o.stake, left=o.sl+session.manualPnl;
+  const pc=w.p*100>=10?Math.round(w.p*100)+'%':(w.p*100).toFixed(1)+'% (about 1 in '+Math.round(1/w.p)+')';
+  $('summary').innerHTML=
+    `<span>This round: <strong>${o.count} × ${money(o.stake)} = ${money(risk)}</strong> at risk</span>`+
+    `<span>${o.label} wins on <strong>${w.txt}</strong> · ${pc} chance</span>`+
+    `<span>Left before stop loss: <strong>${money(Math.max(left,0))}</strong></span>`;
+  updateBuy();
+}
+function updateBuy(){
+  const o=readOrder(), connected=ws&&ws.readyState===1&&account;
+  const realBlocked = account && !account.is_virtual && !$('realOk').checked;
+  const apOn = typeof AP!=='undefined' && (AP.state==='run'||AP.state==='pause');
+  const fbOn = typeof FB!=='undefined' && FB.state==='run';
+  const why = !connected ? 'Not connected. Press Connect first.'
+    : apOn ? `Autopilot is ${AP.state==='pause'?'paused':'running'}. Press STOP in the Autopilot tab to trade manually.`
+    : fbOn ? 'AI Fixed Bet is running. Press STOP in its tab to trade manually.'
+    : roundOpen ? 'Waiting for the last round to settle.'
+    : o.err ? o.err
+    : session.stopped ? `${session.stopped}. Press Reset session or raise the Order panel limit.`
+    : realBlocked ? 'Real account: tick the real-money confirmation at the top.'
+    : '';
+  $('buyBtn').disabled = !!why;
+  $('buyBtn').textContent = roundOpen ? 'Waiting for results…' : `Buy ${isNaN(o.count)?'':o.count} contract${o.count===1?'':'s'}`;
+  $('buyWhy').textContent = why; $('buyWhy').hidden = !why || !connected&&!account;
+}
+/* If Deriv never reports a result, free the Buy button after 20 seconds instead of staying stuck */
+setInterval(()=>{
+  if(!roundOpen) return;
+  const r=rounds.get(roundSeq); if(!r) { roundOpen=false; updateBuy(); return; }
+  r.openedAt=r.openedAt||Date.now();
+  if(Date.now()-r.openedAt>20000&&!r.done){
+    r.done=true; roundOpen=false;
+    showMsg(`Round ${r.no}: no result from Deriv after 20 seconds. Buying is unlocked; check Deriv's statement for that trade.`,'err');
+    if(r.ap&&typeof apPauseFor==='function'&&AP.state==='run') apPauseFor(30,'a round got no result from Deriv');
+    updateBuy();
+  }
+},2000);
+
+function send(msg){
+  return new Promise((res,rej)=>{
+    if(!ws||ws.readyState!==1) return rej(new Error('Not connected to Deriv.'));
+    const id=++seq; msg.req_id=id; pending.set(id,{res,rej}); ws.send(JSON.stringify(msg));
+  });
+}
+function setStatus(){
+  const on = ws&&ws.readyState===1&&account;
+  $('status').classList.toggle('on',!!on);
+  $('statusText').innerHTML = on
+    ? `${account.loginid} <span class="tag ${account.is_virtual?'demo':'real'}">${account.is_virtual?'Demo':'Real'}</span>`
+    : 'Not connected';
+  $('realWarn').hidden = !(on && !account.is_virtual);
+  $('connectBtn').disabled=!!on; $('disconnectBtn').disabled=!ws;
+  $('connectHint').hidden=!!on; if(on) $('scan').hidden=true;
+  updateBuy();
+}
+const API='https://api.derivws.com';
+let token=null, appId=null, accounts=[], pipSize=null;
+async function api(path,method,creds){
+  const c=creds||{token,appId};
+  const r=await fetch(API+path,{method:method||'GET',headers:{'Authorization':'Bearer '+c.token,'Deriv-App-ID':c.appId}});
+  let body=null; try{ body=await r.json(); }catch{}
+  if(!r.ok){
+    const m=body&&((body.errors&&body.errors[0]&&body.errors[0].message)||(body.error&&body.error.message)||body.message);
+    throw new Error(m||`HTTP ${r.status}`);
+  }
+  return body;
+}
+function friendly(e){
+  if(e instanceof TypeError) return 'Could not reach Deriv. Check your internet connection. If it keeps failing, your browser may be blocking requests from a file opened on your computer.';
+  return 'Deriv said: '+e.message;
+}
+async function connect(){
+  const t=$('token').value.trim(), a=$('appId').value.trim();
+  if(!a){ showMsg('Enter the App ID from your Deriv developer dashboard.','err'); return; }
+  if(!t){ showMsg('Paste your Deriv API token first.','err'); return; }
+  token=t; appId=a; $('connectBtn').disabled=true; showMsg('Checking your token…');
+  try{
+    const res=await api('/trading/v1/options/accounts');
+    accounts=(res&&res.data)||[];
+    if(!accounts.length) throw new Error('No Options trading accounts were found for this token.');
+    $('token').value='';
+    const sel=$('account'); sel.innerHTML='';
+    accounts.forEach(x=>{const o=document.createElement('option');o.value=x.account_id;o.textContent=`${x.account_type==='demo'?'Demo':'Real'} · ${x.account_id} · ${x.currency||''}`;sel.appendChild(o);});
+    const pick=accounts.find(x=>x.account_type==='demo')||accounts[0];
+    sel.value=pick.account_id; $('accountField').hidden=false; $('disconnectBtn').disabled=false;
+    await openAccount(pick.account_id);
+  }catch(e){ showMsg(friendly(e),'err'); if(!ws) disconnectAll(); }
+}
+async function checkToken(){
+  const t=$('token').value.trim(), a=$('appId').value.trim(), box=$('scan');
+  if(!a){ showMsg('Enter the App ID from your Deriv developer dashboard.','err'); return; }
+  if(!t){ showMsg('Paste a token to check.','err'); return; }
+  $('checkBtn').disabled=true; showMsg('Checking which accounts this token can use…');
+  try{
+    const res=await api('/trading/v1/options/accounts','GET',{token:t,appId:a});
+    const list=(res&&res.data)||[];
+    const demo=list.filter(x=>x.account_type==='demo'), real=list.filter(x=>x.account_type!=='demo');
+    let verdict, cls;
+    if(!list.length){ verdict='This token works, but no Options trading accounts were found.'; cls=''; }
+    else if(!real.length){ verdict='Demo only. This token cannot touch real money.'; cls='pos'; }
+    else if(!demo.length){ verdict='Real money only. Every trade with this token uses real money.'; cls='neg'; }
+    else { verdict=`Demo and real. This token can reach ${real.length} real-money account${real.length>1?'s':''}. The page picks demo by default, but be careful when switching.`; cls='neg'; }
+    box.innerHTML=`<div class="verdict ${cls}">${verdict}</div><ul>`+list.map(x=>{
+      const isDemo=x.account_type==='demo', bal=Number(x.balance||0).toFixed(2);
+      return `<li><span class="tag ${isDemo?'demo':'real'}">${isDemo?'Demo':'Real'}</span><span>${x.account_id}</span><span>${x.currency||''} ${bal}</span>${x.status&&x.status!=='active'?`<span>${x.status}</span>`:''}</li>`;
+    }).join('')+'</ul>';
+    box.hidden=false; showMsg('Token checked. Nothing was traded.','ok');
+  }catch(e){ box.hidden=true; showMsg(friendly(e),'err'); }
+  finally{ $('checkBtn').disabled=false; }
+}
+function disconnectAll(){
+  token=null; accounts=[]; $('accountField').hidden=true;
+  if(ws) ws.close(); else { account=null; setStatus(); }
+}
+async function openAccount(id){
+  if(ws){ ws.onclose=null; ws.close(); ws=null; clearInterval(pingTimer); account=null; }
+  const acc=accounts.find(x=>x.account_id===id);
+  showMsg('Opening a secure connection…');
+  const r=await api(`/trading/v1/options/accounts/${encodeURIComponent(id)}/otp`,'POST');
+  const url=r&&r.data&&r.data.url;
+  if(!url) throw new Error('No connection link was returned.');
+  resetSession();
+  ws=new WebSocket(url);
+  ws.onopen=()=>{
+    account={loginid:acc.account_id,currency:acc.currency||'USD',is_virtual:acc.account_type==='demo'||/\/ws\/demo/.test(url)};
+    $('sBal').textContent=money(Number(acc.balance||0));
+    setStatus(); showMsg(account.is_virtual?'Connected to your demo account.':'Connected to a real-money account.', account.is_virtual?'ok':'err');
+    cloudDayPull();
+    send({balance:1,subscribe:1}).catch(()=>{});
+    subscribeTicks();
+    pingTimer=setInterval(()=>send({ping:1}).catch(()=>{}),30000);
+    renderSummary();
+  };
+  ws.onmessage=ev=>{
+    let d; try{ d=JSON.parse(ev.data); }catch{ return; }
+    if(d.msg_type==='tick'&&d.tick) onTick(d.tick);
+    else if(d.msg_type==='balance'&&d.balance) $('sBal').textContent=money(Number(d.balance.balance));
+    else if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract) onContract(d.proposal_open_contract);
+    const p=d.req_id&&pending.get(d.req_id);
+    if(p){ pending.delete(d.req_id); d.error?p.rej(new Error(d.error.message)):p.res(d); }
+  };
+  ws.onerror=()=>showMsg('The live connection to Deriv failed. Press Connect to try again.','err');
+  ws.onclose=()=>{
+    clearInterval(pingTimer); pending.forEach(p=>p.rej(new Error('Connection closed.'))); pending.clear();
+    ws=null; account=null; roundOpen=false; token=null; accounts=[]; followId=null; $('accountField').hidden=true; setStatus(); renderLab(); if(typeof apStop==='function') apStop('connection closed','err'); if(typeof fbStop==='function') fbStop('connection closed','err');
+    $('price').textContent='—'; $('symName').textContent='Connect to see live prices'; $('lastDigit').textContent='–';
+  };
+}
+async function subscribeTicks(){
+  digits=[]; hist=[]; pipSize=null; repReset(); renderDigits(); renderFreq(); labReset(); fetchPayouts();
+  try{ await send({forget_all:'ticks'}); }catch{}
+  const sym=$('symbol').value;
+  $('symName').textContent=$('symbol').selectedOptions[0].textContent;
+  send({ticks:sym,subscribe:1}).catch(e=>showMsg('Live ticks unavailable: '+e.message,'err'));
+  send({ticks_history:sym,count:1000,end:'latest',style:'ticks'}).then(r=>{
+    if(sym!==$('symbol').value) return;
+    const prices=(r&&r.history&&r.history.prices)||[];
+    if(!prices.length) return;
+    let p=r.pip_size!=null?Number(r.pip_size):(pipSize||0);
+    if(r.pip_size==null) prices.forEach(x=>{p=Math.max(p,(String(x).split('.')[1]||'').length);});
+    pipSize=Math.max(pipSize||0,p);
+    hist=prices.map(x=>Number(x).toFixed(pipSize).slice(-1));
+    const times=(r.history&&r.history.times)||[];
+    const live=repTicks.splice(0); repReset();
+    prices.forEach((x,i)=>repAdd(Number(times[i])||0,Number(x).toFixed(pipSize),sym));
+    live.forEach(t=>{ if(!t.epoch||!times.length||t.epoch>Number(times[times.length-1])) repAdd(t.epoch,t.q,t.sym); });
+    renderFreq(); labReplay(); renderRepeats();
+  }).catch(()=>{});
+}
+let hist=[], freqN=1000;
+function moveCursor(now){
+  const c=$('cursor'), el=now!=null?$('freq').children[+now]:null;
+  if(!el){ c.hidden=true; return; }
+  const ring=el.querySelector('.ring');
+  c.hidden=false;
+  c.style.left=(ring.offsetLeft+ring.offsetWidth/2)+'px';
+  c.style.top=Math.max(0,ring.offsetTop-14)+'px';
+}
+window.addEventListener('resize',()=>moveCursor(hist.length?hist[hist.length-1]:null));
+function renderFreq(){
+  const sample=hist.slice(-freqN), n=sample.length, counts=Array(10).fill(0);
+  sample.forEach(d=>counts[+d]++);
+  const pcts=counts.map(c=>n?c/n*100:0);
+  const max=Math.max(...pcts), min=Math.min(...pcts), now=hist.length?hist[hist.length-1]:null;
+  $('freq').innerHTML=pcts.map((p,i)=>{
+    const cls=['dg', n&&p===max?'hi':'', n&&p===min&&max!==min?'lo':'', String(i)===now?'now':''].join(' ');
+    return `<div class="${cls}"><div class="ring" style="--p:${Math.min(p*5,100)}"><span>${i}</span></div><div class="pct">${n?p.toFixed(1)+'%':'–'}</div></div>`;
+  }).join('');
+  moveCursor(now);
+  $('freqNote').textContent = !ws||!account ? 'Connect to load recent ticks.'
+    : n<freqN ? `Collecting ticks: ${n} of ${freqN}. Each digit averages 10% over the long run.`
+    : `Last ${freqN} ticks. Green is most frequent, red least. Each new tick is still 10% per digit.`;
+}
+document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
+  freqN=+b.dataset.n;
+  document.querySelectorAll('#seg button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  renderFreq();
+});
+function onTick(t){
+  const sym=t.underlying_symbol||t.symbol;
+  if(sym&&sym!==$('symbol').value) return;
+  if(t.pip_size!=null) pipSize=Number(t.pip_size);
+  else pipSize=Math.max(pipSize||0,(String(t.quote).split('.')[1]||'').length);
+  const s=Number(t.quote).toFixed(pipSize);
+  $('price').textContent=s; $('lastDigit').textContent=s.slice(-1);
+  digits.push({d:s.slice(-1),q:s,epoch:Number(t.epoch)||0}); if(digits.length>24) digits.shift();
+  hist.push(s.slice(-1)); if(hist.length>1000) hist.shift();
+  repAdd(Number(t.epoch)||0,s,$('symbol').value); renderRepeats();
+  renderDigits(); renderFreq();
+  labTick(+s.slice(-1));
+}
+
+/* ---------- AI test lab ---------- */
+const BRAINS=[
+  {id:'hot',name:'Hot',desc:'Matches the most frequent digit',bet:'match'},
+  {id:'cold',name:'Cold',desc:'Matches the least frequent ("due") digit',bet:'match'},
+  {id:'follow',name:'Follower',desc:'Matches the digit that most often came after the current one',bet:'match'},
+  {id:'repeat',name:'Repeat',desc:'Matches the current digit again',bet:'match'},
+  {id:'ouHot',name:'Heavy side',desc:'Over 4 if 5–9 came up more, otherwise Under 5',bet:'ou'},
+  {id:'ouCold',name:'Light side',desc:'Bets on the side (0–4 or 5–9) that came up less',bet:'ou'},
+  {id:'eoHot',name:'Parity',desc:'Even or Odd, whichever came up more',bet:'eo'},
+  {id:'coin',name:'Coin flip',desc:'Even or Odd at random. The control: a brain no better than this has no edge.',bet:'eo'}
+];
+const EST={match:9.5,ou:1.95,eo:1.95};
+let PAY={}, labN=1000, lab={stats:{},pending:[]}, followId=null;
+let labLog=[];
+function labReset(){ lab={stats:{},pending:[],replayed:0}; labLog=[]; BRAINS.forEach(b=>lab.stats[b.id]={n:0,hits:0,pl:0,pick:null}); renderLab(); }
+function argBy(counts,better){ let k=0; for(let i=1;i<10;i++) if(better(counts[i],counts[k])) k=i; return k; }
+function brainPick(b,w){
+  const counts=Array(10).fill(0); w.forEach(d=>counts[+d]++);
+  const cur=+w[w.length-1];
+  const lo=counts.slice(0,5).reduce((a,c)=>a+c,0), hi=counts.slice(5).reduce((a,c)=>a+c,0);
+  const ev=counts.filter((_,i)=>i%2===0).reduce((a,c)=>a+c,0), od=w.length-ev;
+  const M=d=>({kind:'match',digit:d,label:'Match '+d,p:.1});
+  const OVER={kind:'over',digit:4,label:'Over 4',p:.5}, UNDER={kind:'under',digit:5,label:'Under 5',p:.5};
+  const EVEN={kind:'even',label:'Even',p:.5}, ODD={kind:'odd',label:'Odd',p:.5};
+  switch(b.id){
+    case 'hot': return M(argBy(counts,(a,c)=>a>c));
+    case 'cold': return M(argBy(counts,(a,c)=>a<c));
+    case 'follow': {
+      const t=Array(10).fill(0); let any=false;
+      for(let i=0;i<w.length-1;i++) if(+w[i]===cur){ t[+w[i+1]]++; any=true; }
+      return M(any?argBy(t,(a,c)=>a>c):argBy(counts,(a,c)=>a>c));
+    }
+    case 'repeat': return M(cur);
+    case 'ouHot': return hi>=lo?OVER:UNDER;
+    case 'ouCold': return hi>=lo?UNDER:OVER;
+    case 'eoHot': return ev>=od?EVEN:ODD;
+    default: return Math.random()<.5?EVEN:ODD;
+  }
+}
+function pickWins(p,d){
+  switch(p.kind){ case 'match': return d===p.digit; case 'over': return d>p.digit; case 'under': return d<p.digit; case 'even': return d%2===0; default: return d%2===1; }
+}
+function labTick(d){
+  lab.pending.forEach(({id,pick})=>{
+    const s=lab.stats[id], b=BRAINS.find(x=>x.id===id), pay=PAY[b.bet]??EST[b.bet];
+    const won=pickWins(pick,d);
+    s.n++; if(won){ s.hits++; s.pl+=pay-1; } else s.pl-=1;
+    if(labLog.length<100000) labLog.push([new Date().toISOString(),$('symbol').value,d,b.name,pick.label,won?'Won':'Lost',(won?pay-1:-1).toFixed(2),s.pl.toFixed(2)]);
+  });
+  lab.pending=[];
+  if(hist.length>=50){
+    const w=hist.slice(-labN);
+    BRAINS.forEach(b=>{ const p=brainPick(b,w); lab.stats[b.id].pick=p; lab.pending.push({id:b.id,pick:p}); });
+    followTrade(); apTick(); fbTick(d);
+  }
+  renderLab();
+}
+function verdict(s,p){
+  if(s.n<100) return `<span class="st open" title="A verdict appears after 100 predictions">${s.n}/100</span>`;
+  const z=(s.hits-s.n*p)/Math.sqrt(s.n*p*(1-p));
+  if(z>=2.5) return '<span class="st won" title="Above chance so far. Keep watching: it may just be a lucky run.">Above</span>';
+  if(z<=-2.5) return '<span class="st lost" title="Below chance">Below</span>';
+  return '<span class="st open" title="No better or worse than random guessing">Chance</span>';
+}
+function renderLab(){
+  const on=ws&&account;
+  $('labRows').innerHTML=BRAINS.map(b=>{
+    const s=lab.stats[b.id], p=b.bet==='match'?.1:.5;
+    const rate=s.n?(s.hits/s.n*100).toFixed(1)+'%':'–';
+    const pl=s.n?`<span class="${s.pl>=0?'pos':'neg'}">${money(s.pl,true)}</span>`:'–';
+    const fol=followId===b.id;
+    return `<tr><td title="${b.desc}" style="font-family:var(--sans);cursor:help"><b>${b.name}</b></td>`+
+      `<td>${s.pick?s.pick.label:'–'}</td><td>${s.n}</td><td>${rate} <span class="sym">(${p*100}%)</span></td><td>${pl}</td><td>${verdict(s,p)}</td>`+
+      `<td><button class="followBtn${fol?' primary':''}" data-id="${b.id}" ${on?'':'disabled'} style="padding:4px 8px;font-size:12px">${fol?'Following':'Follow'}</button></td></tr>`;
+  }).join('');
+  document.querySelectorAll('.followBtn').forEach(x=>x.onclick=()=>toggleFollow(x.dataset.id));
+  const st=$('labStatus');
+  if(!on) st.textContent='Connect to start the brains.';
+  else if(followId) st.textContent=`Following ${BRAINS.find(b=>b.id===followId).name} on your demo account: one $${num('stake').toFixed(2)} contract each time the last trade settles. Your take profit and stop loss still apply.`;
+  else st.textContent=hist.length<50?'Waiting for ticks…':`Running on paper${lab.replayed?`, including ${lab.replayed} predictions back-tested on recent ticks`:''}. Press Follow on a brain to trade its picks on demo.`;
+}
+function toggleFollow(id){
+  if(AP.state!=='off'&&AP.state!=='stopped'){ showMsg('Autopilot is running. Stop it before following a brain yourself.','err'); return; }
+  if(followId===id){ followId=null; renderLab(); showMsg('Stopped following.'); return; }
+  if(!account||!account.is_virtual){ showMsg('Follow only works on a demo account. Switch to your demo account first.','err'); return; }
+  if(session.stopped){ showMsg(session.stopped+'. Reset the session before following a brain.','err'); return; }
+  followId=id; $('count').value=1; $('ticks').value=1; renderSummary(); renderLab();
+  showMsg(`Following ${BRAINS.find(b=>b.id===id).name}.`,'ok');
+}
+function followTrade(){
+  if(!followId) return;
+  if(!account||!account.is_virtual){ followId=null; return; }
+  if(session.stopped){ showMsg(session.stopped+'. Stopped following.', session.stopped.startsWith('Take')?'ok':'err'); followId=null; return; }
+  if(roundOpen) return;
+  const p=lab.stats[followId].pick; if(!p) return;
+  $('kind').value=p.kind; if(p.digit!=null) $('digit').value=p.digit;
+  $('count').value=1; $('ticks').value=1; renderSummary();
+  nextBrain=BRAINS.find(b=>b.id===followId).name;
+  buyRound();
+}
+let nextBrain=null;
+function renderByBrain(){
+  const g=new Map();
+  contracts.forEach(r=>{
+    if(r.profit==null) return;
+    const k=r.brain||'Manual', s=g.get(k)||{n:0,w:0,pl:0};
+    s.n++; if(r.status==='won') s.w++; s.pl+=r.profit; g.set(k,s);
+  });
+  $('byBrainWrap').hidden=!g.size;
+  $('byBrain').innerHTML=[...g.entries()].sort((a,b)=>b[1].pl-a[1].pl).map(([k,s])=>
+    `<tr><td style="font-family:var(--sans)"><b>${k}</b></td><td>${s.n}</td><td>${s.w} / ${s.n-s.w}</td><td>${(s.w/s.n*100).toFixed(1)}%</td><td class="${s.pl>=0?'pos':'neg'}">${money(s.pl,true)}</td></tr>`).join('');
+}
+async function fetchPayouts(){
+  PAY={}; const sym=$('symbol').value;
+  const specs=[{key:'match',contract_type:'DIGITMATCH',barrier:'5'},{key:'ou',contract_type:'DIGITOVER',barrier:'4'},{key:'eo',contract_type:'DIGITEVEN'}];
+  await Promise.all(specs.map(sp=>{
+    const prm={proposal:1,amount:1,basis:'stake',contract_type:sp.contract_type,currency:cur(),duration:1,duration_unit:'t',underlying_symbol:sym};
+    if(sp.barrier) prm.barrier=sp.barrier;
+    return send(prm).then(r=>{ const v=Number(r&&r.proposal&&r.proposal.payout); if(v>0) PAY[sp.key]=v; }).catch(()=>{});
+  }));
+  const f=k=>PAY[k]?`$${PAY[k].toFixed(2)}`:`about $${EST[k].toFixed(2)} (estimate)`;
+  $('payNote').textContent=`Payout per $1 on this market: Matches ${f('match')}, Over 4 / Under 5 ${f('ou')}, Even / Odd ${f('eo')}. Real trades settle a tick or so after you buy, so following a brain is slightly less exact than the paper score.`;
+}
+document.querySelectorAll('#labSeg button').forEach(b=>b.onclick=()=>{
+  labN=+b.dataset.n; $('labNlbl').textContent=labN;
+  document.querySelectorAll('#labSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  labReset(); labReplay();
+});
+/* Score every brain on the ticks already loaded, so they start with a track record instead of zero */
+function labReplay(){
+  if(hist.length<100) return;
+  const H=hist.slice(), pend=lab.pending; lab.pending=[];
+  for(let i=50;i<H.length;i++){
+    const w=H.slice(Math.max(0,i-labN),i), d=+H[i];
+    BRAINS.forEach(b=>{ const pick=brainPick(b,w), s=lab.stats[b.id], pay=PAY[b.bet]??EST[b.bet];
+      s.n++; if(pickWins(pick,d)){ s.hits++; s.pl+=pay-1; } else s.pl-=1; });
+  }
+  lab.pending=pend; lab.replayed=H.length-50;
+  renderLab();
+}
+const marks=new Map();
+function renderDigits(){
+  $('strip').innerHTML=digits.map(x=>{
+    const m=(x.epoch&&marks.get(x.epoch))||marks.get('q'+x.q), c=[];
+    if(m&&m.clicked) c.push('clicked'); if(m&&m.result) c.push(m.result);
+    return `<span class="${c.join(' ')}" title="${m?m.title.join(' · '):x.q}">${x.d}</span>`;
+  }).join('');
+}
+function addMark(key,patch,title){ const m=marks.get(key)||{title:[]}; Object.assign(m,patch); m.title.push(title); marks.set(key,m); if(marks.size>200) marks.delete(marks.keys().next().value); renderDigits(); }
+
+async function buyRound(ap){
+  const src=ap?(ap.src||'ap'):'manual';
+  const brain=src==='fixed'?'AI Fixed Bet':ap?('Autopilot · '+ap.brain):(nextBrain||'Manual'); nextBrain=null;
+  let o;
+  if(ap){ const k=KINDS[ap.kind]; o={kind:ap.kind,k,digit:ap.digit,stake:ap.stake,count:ap.count,ticks:1,symbol:$('symbol').value,label:k.label+(k.digit?' '+ap.digit:'')}; }
+  else o=readOrder();
+  if(o.err){ showMsg(o.err,'err'); return; }
+  if(!ap&&session.stopped){ showMsg(session.stopped+'. Reset the session to trade again.','err'); return; }
+  const risk=o.count*o.stake, left=o.sl+session.manualPnl;
+  if(!ap&&risk>left+1e-9){ showMsg(`This round puts ${money(risk)} at risk, but only ${money(Math.max(left,0))} is left before your ${money(o.sl)} stop loss. Lower the stake or the number of contracts.`,'err'); return; }
+  let ctype=o.k.type;
+  if(o.kind==='runalt'){ ctype=altUp?'RUNHIGH':'RUNLOW'; o.label=altUp?'Only Ups':'Only Downs'; altUp=!altUp; }
+  const params={amount:o.stake,basis:'stake',contract_type:ctype,currency:cur(),duration:o.ticks,duration_unit:'t',underlying_symbol:o.symbol};
+  if(o.k.digit) params.barrier=String(o.digit);
+  const r={no:++roundSeq,total:0,settled:0,pnl:0,ready:false,ap:src==='ap',src,openedAt:Date.now()};
+  const lastT=digits[digits.length-1]; if(lastT) addMark(lastT.epoch||'q'+lastT.q,{clicked:true},`You pressed Buy on this tick (round ${r.no}, last digit ${lastT.d})`);
+  rounds.set(r.no,r); roundOpen=true; updateBuy(); showMsg(`Placing ${o.count} contracts…`);
+  const tasks=Array.from({length:o.count},()=>send({buy:1,price:o.stake,parameters:params,subscribe:1}).then(res=>{
+    const b=res.buy;
+    const row={id:b.contract_id,round:r.no,label:o.label,symbol:o.symbol,brain,stake:Number(b.buy_price),payout:Number(b.payout),profit:null,status:'open',exit:'',isDigit:!o.k.run,time:new Date()};
+    contracts.set(b.contract_id,row); r.total++;
+    if(orphans.has(b.contract_id)){ const poc=orphans.get(b.contract_id); orphans.delete(b.contract_id); onContract(poc); }
+    return row;
+  }));
+  const results=await Promise.allSettled(tasks);
+  const failed=results.filter(x=>x.status==='rejected');
+  r.ready=true;
+  if(r.total===0){ rounds.delete(r.no); roundSeq--; roundOpen=false; updateBuy(); showMsg('No contracts were bought: '+failed[0].reason.message,'err'); if(src==='ap') apBuyFailed(failed[0].reason.message); if(src==='fixed') fbStop('Deriv rejected the order: '+failed[0].reason.message,'err'); return; }
+  session.rounds++;
+  showMsg(failed.length?`${r.total} of ${o.count} bought. ${failed.length} failed: ${failed[0].reason.message}`:`${r.total} contracts open. Waiting for the result…`, failed.length?'err':'');
+  renderRows(); renderStats(); checkRound(r);
+}
+function onContract(poc){
+  const row=contracts.get(poc.contract_id);
+  if(!row){ orphans.set(poc.contract_id,poc); return; }
+  if(row.status!=='open') return;
+  if(!(poc.is_sold||poc.status==='won'||poc.status==='lost')) return;
+  row.profit=Number(poc.profit);
+  row.status=poc.status==='won'||poc.status==='lost'?poc.status:(row.profit>0?'won':'lost');
+  {
+    const et=Number(poc.exit_tick_time||poc.exit_spot_time||0), ev=poc.exit_tick_display_value??poc.exit_spot_display_value;
+    const key=et||(ev!=null?'q'+String(ev):null);
+    const rr=rounds.get(row.round);
+    if(key&&!(rr&&rr.marked&&rr.marked.has(key))){ if(rr){ rr.marked=rr.marked||new Set(); rr.marked.add(key); }
+      addMark(key,{result:row.status},`Round ${row.round} settled on this tick: ${row.status==='won'?'Won':'Lost'} (${row.label})`); }
+  }
+  const ex=poc.exit_tick_display_value??poc.exit_spot_display_value??poc.exit_tick??poc.exit_spot??poc.current_spot_display_value;
+  if(row.isDigit&&ex!=null&&ex!=='') row.exit=(typeof ex==='number'&&pipSize!=null?ex.toFixed(pipSize):String(ex)).slice(-1);
+  session.pnl=Math.round((session.pnl+row.profit)*100)/100;
+  { const rr=rounds.get(row.round); if(rr&&rr.src==='fixed') session.fbPnl=Math.round(((session.fbPnl||0)+row.profit)*100)/100; else if(rr&&rr.ap) session.apPnl=Math.round((session.apPnl+row.profit)*100)/100; else session.manualPnl=Math.round((session.manualPnl+row.profit)*100)/100; }
+  row.status==='won'?session.won++:session.lost++;
+  const r=rounds.get(row.round); r.settled++; r.pnl+=row.profit;
+  cloudTrade(row,r);
+  checkRound(r); checkStops(); renderRows(); renderStats(); renderSummary();
+}
+function checkRound(r){
+  if(!r.ready||r.settled<r.total) return;
+  if(r.done) return; r.done=true;
+  if(r.pnl<0){ session.streak++; session.maxStreak=Math.max(session.maxStreak,session.streak); } else session.streak=0;
+  roundOpen=false;
+  showMsg(`Round ${r.no}: ${money(r.pnl,true)}`, r.pnl>=0?'ok':'err');
+  updateBuy(); renderStats();
+  if(r.ap) apRoundDone(r);
+  if(r.src==='fixed') fbRoundDone(r);
+}
+function checkStops(){
+  const tp=num('tp'), sl=num('sl');
+  if(session.manualPnl>=tp) session.stopped='Manual take profit reached';
+  else if(sl+session.manualPnl<0.35) session.stopped='Manual stop loss reached';
+}
+function renderStats(){
+  $('sSplit').innerHTML=`Manual <b class="${session.manualPnl>=0?'pos':'neg'}">${money(session.manualPnl,true)}</b> · Autopilot <b class="${session.apPnl>=0?'pos':'neg'}">${money(session.apPnl,true)}</b> · Fixed Bet <b class="${session.fbPnl>=0?'pos':'neg'}">${money(session.fbPnl||0,true)}</b> <span title="Each side has its own limits. Manual uses the Order panel's take profit and stop loss; Autopilot uses its own budget.">(separate limits)</span>`;
+  const p=$('sPnl'); p.textContent=money(session.pnl,true); p.className='v '+(session.pnl>0?'pos':session.pnl<0?'neg':'');
+  $('sRounds').textContent=session.rounds;
+  $('sWL').textContent=`${session.won} / ${session.lost}`;
+  const n=session.won+session.lost;
+  $('sRate').textContent=n?Math.round(session.won/n*100)+'%':'–';
+  $('sStreak').textContent=`${session.maxStreak} round${session.maxStreak===1?'':'s'}`;
+  const st=$('stopText'); st.textContent=session.stopped?session.stopped+'. Buying is paused.':'Trading open';
+  st.className=session.stopped?(session.stopped.startsWith('Take')?'pos':'neg'):'';
+}
+function renderRows(){
+  const list=[...contracts.values()].sort((a,b)=>b.round-a.round||a.id-b.id).slice(0,200);
+  renderByBrain();
+  if(!list.length){ $('rows').innerHTML='<tr><td colspan="7" class="empty">Results appear here after your first round.</td></tr>'; return; }
+  let prev=null;
+  $('rows').innerHTML=list.map(r=>{
+    const cls=prev!==null&&prev!==r.round?' class="newround"':''; prev=r.round;
+    const pl=r.profit===null?'<span class="st open">Open</span>':`<span class="${r.profit>=0?'pos':'neg'}" title="${r.status==='won'?'Won':'Lost'}">${money(r.profit,true)}</span>`;
+    return `<tr${cls}><td>#${r.round}</td><td>${r.time.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}</td><td style="font-family:var(--sans)">${r.brain||'Manual'}</td><td>${r.label}</td><td>${money(r.stake)} → ${money(r.payout)}</td><td>${r.exit||'–'}</td><td>${pl}</td></tr>`;
+  }).join('');
+}
+
+$('connectBtn').onclick=connect;
+$('checkBtn').onclick=checkToken;
+$('token').addEventListener('input',()=>{ $('scan').hidden=true; });
+$('disconnectBtn').onclick=()=>{ disconnectAll(); showMsg('Disconnected.'); };
+$('account').onchange=()=>{
+  if(roundOpen){ showMsg('Wait for the open round to finish before switching accounts.','err'); $('account').value=account?account.loginid:''; return; }
+  openAccount($('account').value).catch(e=>showMsg(friendly(e),'err'));
+};
+$('buyBtn').onclick=()=>buyRound();
+$('resetBtn').onclick=()=>{ if(roundOpen){ showMsg('Wait for the open round to finish before resetting.','err'); return; } resetSession(); renderSummary(); showMsg('Session reset.'); };
+$('realOk').onchange=updateBuy;
+/* One market for the whole page: the Manual, Autopilot and AI Fixed Bet dropdowns stay in sync */
+function setMarket(v){
+  ['symbol','apSymbol','fbSymbol'].forEach(id=>{ if($(id).value!==v) $(id).value=v; });
+  if(ws&&account) subscribeTicks();
+  renderSummary();
+}
+['symbol','apSymbol','fbSymbol'].forEach(id=>$(id).addEventListener('change',e=>{
+  const busy=(AP.state==='run'||AP.state==='pause')||FB.state==='run'||roundOpen;
+  if(busy){ const cur=$(id===('symbol')?'apSymbol':'symbol').value; e.target.value=cur; showMsg('Stop the running bot (and let the open round finish) before changing market.','err'); apMsgShow('Stop Autopilot before changing market.','err'); fbMsg('Stop AI Fixed Bet before changing market.','err'); return; }
+  setMarket(e.target.value);
+}));
+['kind','digit','stake','count','ticks','tp','sl'].forEach(id=>$(id).addEventListener('input',renderSummary));
+$('kind').addEventListener('change',()=>{ const k=KINDS[$('kind').value];
+  const t=parseInt($('ticks').value,10);
+  if(k.run&&!(t>=2&&t<=5)) $('ticks').value=5;
+  if(k.digit){ const d=parseInt($('digit').value,10); if(isNaN(d)||d<k.min||d>k.max) $('digit').value=k.min; } renderSummary(); });
+
+function apMsgShow(t,cls){ const m=$('apMsg'); m.textContent=t||''; m.className='msg'+(cls?' '+cls:''); }
+/* ---------- Autopilot (rule-based) ---------- */
+var AP={state:'off',pnl:0,peak:0,rounds:0,streak:0,start:0,pauseUntil:0,brain:null,lastPickTick:0,ticks:0,why:''};
+const apv=id=>num(id);
+function apLimits(){
+  const real=account&&!account.is_virtual;
+  let L={budget:apv('apBudget'),target:apv('apTarget'),stake:apv('apStake'),round:apv('apRound'),streak:Math.round(apv('apStreak')),cool:apv('apCool'),
+    maxRounds:Math.round(apv('apMaxTrades')),maxMin:apv('apMaxMin'),minPred:Math.round(apv('apMinPred')),protect:$('apProtect').checked,protectAt:apv('apProtectAt'),floor:apv('apFloor'),daily:apv('apDaily'),lock:apv('apLock'),strict:$('apStrict').checked,
+    allow:{match:$('apAllowMatch').checked,ou:$('apAllowOU').checked,eo:$('apAllowEO').checked}};
+  if(real){ L.stake=Math.min(L.stake,1); L.budget=Math.min(L.budget,3); L.round=Math.min(L.round,3); }
+  return L;
+}
+const DAYMEM={};
+function dayKey(){ return 'digitdesk:'+(account?account.loginid:'none')+':'+new Date().toLocaleDateString('en-CA'); }
+function loadDay(){ const k=dayKey(); let d=null; try{ d=JSON.parse(localStorage.getItem(k)); }catch{} return d||DAYMEM[k]||{pnl:0,sessions:0,lockUntil:0,lockWhy:''}; }
+function saveDay(d){ const k=dayKey(); DAYMEM[k]=d; try{ localStorage.setItem(k,JSON.stringify(d)); }catch{} cloudDayPush(d); }
+function midnight(){ const d=new Date(); d.setHours(24,0,0,0); return d.getTime(); }
+function apNote(t){
+  const box=$('apNotes'); if(box.firstElementChild&&box.firstElementChild.classList.contains('hint')) box.innerHTML='';
+  const d=document.createElement('div'); d.innerHTML=`<time>${new Date().toLocaleTimeString([], {hour12:false})}</time>`; d.appendChild(document.createTextNode(t));
+  box.prepend(d); while(box.children.length>60) box.lastChild.remove();
+}
+function apSetState(st,why){
+  AP.state=st; if(why) AP.why=why;
+  const el=$('apState'); el.className='apstate'+(st==='run'?' run':st==='pause'?' pause':st==='stopped'?' stopped':'');
+  el.textContent=st==='run'?'Running':st==='pause'?'Paused':st==='stopped'?'Stopped':'Off';
+  const live=st==='run'||st==='pause';
+  if(typeof updateBuy==='function') updateBuy();
+  $('apStart').disabled=live; $('apStop').disabled=!live; $('apPause').disabled=!live;
+  $('apPause').textContent=st==='pause'?'Resume':'Pause';
+  document.querySelectorAll('#apCard input').forEach(i=>{ if(i.id!=='apNoChase') i.disabled=live; });
+  ['symbol','apSymbol','fbSymbol'].forEach(id=>$(id).disabled=live||(typeof FB!=='undefined'&&FB.state==='run'));
+  apRender();
+}
+function apRender(){
+  const L=apLimits(); if(AP.state!=='off'&&AP.budgetEff) L.budget=AP.budgetEff;
+  const used=Math.max(0,-AP.pnl), frac=L.budget>0?Math.min(used/L.budget,1):0, bar=$('apBar');
+  bar.style.width=(frac*100)+'%'; bar.style.background=frac>=.8?'var(--loss)':frac>=.5?'var(--cursor)':'var(--accent)';
+  $('apBudgetText').textContent = AP.state==='off'?`Budget ${money(L.budget)} ready`
+    : AP.pnl>=0?`Up ${money(AP.pnl)} · budget untouched (${money(L.budget)})`
+    : `${money(used)} of ${money(L.budget)} used · ${money(Math.max(L.budget-used,0))} left`;
+  apRenderToday();
+  if(AP.state==='off'){ $('apStats').innerHTML=''; return; }
+  const mins=AP.start?Math.floor((Date.now()-AP.start)/60000):0;
+  let st=AP.state==='pause'&&AP.pauseUntil?` · resumes in ${Math.max(0,Math.ceil((AP.pauseUntil-Date.now())/1000))}s`:'';
+  $('apStats').innerHTML=`<span>P/L <b class="${AP.pnl>=0?'pos':'neg'}">${money(AP.pnl,true)}</b></span><span>Peak <b>${money(AP.peak,true)}</b></span><span>Rounds <b>${AP.rounds}/${L.maxRounds}</b></span><span>Time <b>${mins}/${L.maxMin} min</b></span><span>Brain <b>${AP.brain?BRAINS.find(b=>b.id===AP.brain).name:'none yet'}</b></span>`+(AP.why&&AP.state!=='run'?`<span>${AP.why}${st}</span>`:'');
+}
+function apRenderToday(){
+  if(!account){ $('apToday').innerHTML=''; return; }
+  const L=apLimits(), d=loadDay(), left=Math.max(0,L.daily+d.pnl), now=Date.now();
+  let lock=d.lockUntil>now?` · <b class="neg">locked ${Math.ceil((d.lockUntil-now)/60000)} min</b> (${d.lockWhy})`:'';
+  $('apToday').innerHTML=`Today: P/L <b class="${d.pnl>=0?'pos':'neg'}">${money(d.pnl,true)}</b> · ${d.sessions} session${d.sessions===1?'':'s'} · <b>${money(left)}</b> of ${money(L.daily)} daily limit left${lock}`;
+}
+function apStart(){
+  if(!ws||!account){ apMsgShow('Connect first.','err'); return; }
+  const real=!account.is_virtual;
+  if(real&&!$('apReal').checked){ apMsgShow('Autopilot is demo-only unless you tick "Allow real money".','err'); return; }
+  if(real&&!$('realOk').checked){ apMsgShow('Tick the real-money confirmation at the top first.','err'); return; }
+  const L=apLimits();
+  if(!(L.budget>=0.35&&L.target>0&&L.stake>=0.35&&L.round>=L.stake&&L.maxRounds>=1&&L.maxMin>=1)){ apMsgShow('Check the Autopilot limits: budget and stake at least 0.35, max per round at least one stake.','err'); return; }
+  if(!L.allow.match&&!L.allow.ou&&!L.allow.eo){ apMsgShow('Allow at least one bet type.','err'); return; }
+  if(FB.state==='run'){ apMsgShow('Stop AI Fixed Bet first.','err'); return; }
+  if(roundOpen){ apMsgShow('Wait for the open round to finish.','err'); return; }
+  const day=loadDay(), now=Date.now();
+  if(day.lockUntil>now){ apMsgShow(`Autopilot is locked for ${Math.ceil((day.lockUntil-now)/60000)} more minutes (${day.lockWhy}).`,'err'); apRenderToday(); return; }
+  const dailyLeft=L.daily+day.pnl;
+  if(dailyLeft<0.35){ apMsgShow(`Today's ${money(L.daily)} loss limit is used up. Autopilot can start again tomorrow.`,'err'); return; }
+  AP.budgetEff=Math.min(L.budget,Math.floor(dailyLeft*100)/100);
+  day.sessions++; saveDay(day);
+  followId=null; renderLab(); $('apSummary').hidden=true;
+  Object.assign(AP,{pnl:0,peak:0,rounds:0,wins:0,streak:0,start:Date.now(),pauseUntil:0,brain:null,lastPickTick:0,ticks:0,why:''});
+  $('apNotes').innerHTML='';
+  apSetState('run');
+  apNote(`Started on ${account.is_virtual?'demo':'REAL'} account ${account.loginid}. Budget ${money(AP.budgetEff)}${AP.budgetEff<L.budget?' (cut to fit today\'s limit)':''}, target ${money(L.target)}, up to ${Math.max(1,Math.min(10,Math.floor(L.round/L.stake+1e-9)))} × ${money(L.stake)} per round.`);
+}
+function apStop(reason,cls,lock){
+  if(AP.state==='off'||AP.state==='stopped') return;
+  const L=apLimits(), d=loadDay();
+  if(lock==='day'){ d.lockUntil=midnight(); d.lockWhy='daily loss limit reached'; saveDay(d); }
+  else if(lock&&L.lock>0){ d.lockUntil=Date.now()+L.lock*60000; d.lockWhy='session budget used'; saveDay(d); }
+  apSetState('stopped',reason); apNote('Stopped: '+reason); apMsgShow('Autopilot stopped: '+reason, cls||'');
+  const mins=Math.max(1,Math.round((Date.now()-AP.start)/60000)), sm=$('apSummary');
+  sm.innerHTML=`<div><b>Session summary</b></div><div>Stopped because: ${reason}</div><div>Rounds <b>${AP.rounds}</b> · won <b>${AP.wins}</b> (${AP.rounds?Math.round(AP.wins/AP.rounds*100):0}%) · P/L <b class="${AP.pnl>=0?'pos':'neg'}">${money(AP.pnl,true)}</b> · peak <b>${money(AP.peak,true)}</b> · ${mins} min</div>`+
+    (d.lockUntil>Date.now()?`<div class="neg">Autopilot is locked until ${new Date(d.lockUntil).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false})}. Take a break.</div>`:'');
+  sm.hidden=false; apRenderToday();
+}
+function apPauseFor(sec,why){ AP.pauseUntil=sec?Date.now()+sec*1000:0; apSetState('pause',why); apNote(`Paused: ${why}${sec?` (${sec}s)`:''}.`); }
+function apChooseBrain(L){
+  const ok=BRAINS.filter(b=>b.id!=='coin'&&L.allow[b.bet]&&lab.stats[b.id].n>=L.minPred);
+  if(!ok.length) return {id:null,msg:`Waiting: no allowed brain has ${L.minPred} predictions yet.`};
+  let best=null; ok.forEach(b=>{ const s=lab.stats[b.id], per=s.pl/s.n, p=b.bet==='match'?.1:.5, z=(s.hits-s.n*p)/Math.sqrt(s.n*p*(1-p));
+    if(L.strict&&z<2.5) return; if(!best||per>best.per) best={id:b.id,per,s,z}; });
+  if(!best) return {id:null,msg:'Waiting (strict): no brain is clearly above chance. On random ticks this is the expected result.'};
+  if(best.per<=0) return {id:null,msg:'Waiting: every eligible brain is losing on paper, so no trade has an edge right now.'};
+  return {id:best.id,msg:`Chose ${BRAINS.find(b=>b.id===best.id).name}: ${(best.s.hits/best.s.n*100).toFixed(1)}% over ${best.s.n} predictions, paper ${money(best.s.pl,true)}.`};
+}
+function apTick(){
+  if(AP.state==='off'||AP.state==='stopped') return;
+  AP.ticks++;
+  const L=apLimits();
+  if(!ws||!account){ apStop('connection lost','err'); return; }
+  if(Date.now()-AP.start>=L.maxMin*60000){ apStop(`reached ${L.maxMin} minutes`); return; }
+  if(AP.state==='pause'){
+    if(AP.pauseUntil&&Date.now()>=AP.pauseUntil){ AP.pauseUntil=0; AP.streak=0; AP.brain=null; apSetState('run'); apNote('Pause over. Re-checking brains.'); }
+    else { apRender(); return; }
+  }
+  if(roundOpen) { apRender(); return; }
+  if(!AP.brain||AP.ticks-AP.lastPickTick>=25){
+    const c=apChooseBrain(L); AP.lastPickTick=AP.ticks;
+    if(c.id!==AP.brain||!c.id){ if(c.msg!==AP.lastMsg) apNote(c.msg); AP.lastMsg=c.msg; }
+    AP.brain=c.id;
+  }
+  if(!AP.brain){ apRender(); return; }
+  const pick=lab.stats[AP.brain].pick; if(!pick){ apRender(); return; }
+  const left=AP.budgetEff+AP.pnl;
+  let stake=L.stake, count=Math.max(1,Math.min(10,Math.floor(L.round/stake+1e-9)));
+  while(count>1&&count*stake>left+1e-9) count--;
+  if(count*stake>left+1e-9){ stake=Math.floor(left*100)/100; count=1; }
+  if(stake<0.35){ apStop('session budget used up','err',true); return; }
+  const b=BRAINS.find(x=>x.id===AP.brain);
+  buyRound({kind:pick.kind,digit:pick.digit,stake,count,brain:b.name});
+  apRender();
+}
+function apRoundDone(r){
+  if(AP.state==='off'||AP.state==='stopped') return;
+  const L=apLimits();
+  AP.pnl=Math.round((AP.pnl+r.pnl)*100)/100; AP.rounds++; AP.peak=Math.max(AP.peak,AP.pnl);
+  AP.streak=r.pnl<0?AP.streak+1:0; if(r.pnl>0) AP.wins++;
+  const d=loadDay(); d.pnl=Math.round((d.pnl+r.pnl)*100)/100; saveDay(d);
+  if(L.daily+d.pnl<0.35){ apStop(`today's ${money(L.daily)} loss limit reached`,'err','day'); return; }
+  if(AP.pnl<=-AP.budgetEff+0.0001||AP.budgetEff+AP.pnl<0.35){ apStop(`session budget of ${money(AP.budgetEff)} used`,'err',true); return; }
+  if(AP.pnl>=L.target){ apStop(`profit target reached (${money(AP.pnl,true)})`,'ok'); return; }
+  if(L.protect&&AP.peak>=L.protectAt&&AP.pnl<=L.floor){ apStop(`protected winnings: was up ${money(AP.peak)}, fell to ${money(AP.pnl,true)}`,'ok'); return; }
+  if(AP.rounds>=L.maxRounds){ apStop(`reached ${L.maxRounds} rounds`); return; }
+  if(AP.streak>=L.streak){ apPauseFor(L.cool,`${AP.streak} losing rounds in a row`); return; }
+  apRender();
+}
+function apBuyFailed(msg){ if(AP.state==='run') apPauseFor(30,'Deriv rejected the order: '+msg); }
+
+/* ---------- AI Fixed Bet ---------- */
+var FB={state:'off',pnl:0,rounds:0,wins:0,red:null,mode:null};
+function fbMsg(t,cls){ const m=$('fbMsg'); m.textContent=t||''; m.className='msg'+(cls?' '+cls:''); }
+const FB_LIMIT=10.0;
+/* Reads Digit frequency exactly as shown (1 decimal) and judges 0 and 9 separately */
+function fbPlan(){
+  const sample=hist.slice(-freqN); if(sample.length<50) return null;
+  const c=Array(10).fill(0); sample.forEach(d=>c[+d]++);
+  const mx=Math.max(...c), greens=c.map((v,i)=>v===mx?i:-1).filter(i=>i>=0);
+  const pct=c.map(v=>+(v/sample.length*100).toFixed(1));
+  const judge=d=>{
+    const want=d===0?fbMode!=='under':fbMode!=='over';
+    if(!want) return {ok:false,why:'off in this mode'};
+    if(greens.includes(d)) return {ok:false,why:'green ring'};
+    if(pct[d]>FB_LIMIT) return {ok:false,why:`above ${FB_LIMIT.toFixed(1)}%`};
+    return {ok:true,why:'ready'};
+  };
+  return {greens,pct,j0:judge(0),j9:judge(9)};
+}
+let fbMode='both';
+try{ fbMode=localStorage.getItem('digitdesk:fbMode')||'both'; }catch{}
+function fbBetFor(d,pl){
+  if(!pl) return null;
+  if(d===0&&pl.j0.ok) return {kind:'over',digit:0,label:'Over 0'};
+  if(d===9&&pl.j9.ok) return {kind:'under',digit:9,label:'Under 9'};
+  return null;
+}
+function fbTriggers(pl){ if(!pl) return '–'; const t=[]; if(pl.j0.ok) t.push('0'); if(pl.j9.ok) t.push('9'); return t.length?t.join(' or '):'waiting'; }
+function fbSetMode(m){
+  if(FB.state==='run') return;
+  fbMode=m; try{ localStorage.setItem('digitdesk:fbMode',m); }catch{}
+  document.querySelectorAll('#fbModeSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m?'true':'false'));
+  $('fbRuleText').innerHTML = m==='over'?'Cursor lands on <b>0</b> → buys <b>Over 0</b> (9s are ignored)'
+    : m==='under'?'Cursor lands on <b>9</b> → buys <b>Under 9</b> (0s are ignored)'
+    : '<b>Auto:</b> cursor lands on <b>0</b> → buys <b>Over 0</b> · cursor lands on <b>9</b> → buys <b>Under 9</b>';
+  fbRender();
+}
+document.querySelectorAll('#fbModeSeg button').forEach(b=>b.onclick=()=>fbSetMode(b.dataset.m));
+function fbRender(){
+  const pl=fbPlan(); $('fbN').textContent=freqN;
+  [[0,'fbD0','fbW0','j0'],[9,'fbD9','fbW9','j9']].forEach(([d,v,w,j])=>{
+    $(v).textContent=pl?pl.pct[d].toFixed(1)+'%':'–'; $(v).className='v '+(pl?(pl[j].ok?'pos':'neg'):'');
+    $(w).textContent=pl?(pl[j].ok?'✓ ready':'✗ '+pl[j].why):'';
+  });
+  $('fbWait').textContent=fbTriggers(pl); $('fbWait').className='v hot';
+  $('fbG').textContent=pl?'green ring: '+pl.greens.join(', '):'';
+  const el=$('fbState'); el.className='apstate'+(FB.state==='run'?' run':FB.state==='stopped'?' stopped':''); el.textContent=FB.state==='run'?'Running':FB.state==='stopped'?'Stopped':'Off';
+  $('fbStart').disabled=FB.state==='run'; $('fbStop').disabled=FB.state!=='run';
+  ['fbStake','fbCount','fbTP','fbSL'].forEach(id=>$(id).disabled=FB.state==='run');
+  document.querySelectorAll('#fbModeSeg button').forEach(b=>b.disabled=FB.state==='run');
+  ['symbol','apSymbol','fbSymbol'].forEach(id=>$(id).disabled=FB.state==='run'||AP.state==='run'||AP.state==='pause');
+  $('fbStats').innerHTML=FB.state==='off'?'':`<span>P/L <b class="${FB.pnl>=0?'pos':'neg'}">${money(FB.pnl,true)}</b></span><span>Rounds <b>${FB.rounds}</b></span><span>Won <b>${FB.wins}</b></span><span>Left before stop loss <b>${money(Math.max(num('fbSL')+FB.pnl,0))}</b></span>`;
+}
+function fbStart(){
+  if(!ws||!account){ fbMsg('Connect first.','err'); return; }
+  if(!account.is_virtual){ fbMsg('AI Fixed Bet only runs on a demo account for now. Switch to your demo account.','err'); return; }
+  if(AP.state==='run'||AP.state==='pause'){ fbMsg('Stop Autopilot first.','err'); return; }
+  if(roundOpen){ fbMsg('Wait for the open round to finish.','err'); return; }
+  const stake=num('fbStake'), count=parseInt($('fbCount').value,10), tp=num('fbTP'), sl=num('fbSL');
+  if(!(stake>=0.35&&count>=1&&count<=10&&tp>0&&sl>=0.35)){ fbMsg('Check the settings: stake at least 0.35, 1–10 contracts, take profit and stop loss above 0.','err'); return; }
+  if(stake*count>sl+1e-9){ fbMsg(`One round risks ${money(stake*count)}, more than your ${money(sl)} stop loss. Lower the stake or contracts, or raise the stop loss.`,'err'); return; }
+  followId=null; renderLab();
+  Object.assign(FB,{state:'run',pnl:0,rounds:0,wins:0}); updateBuy();
+  const pl=fbPlan();
+  fbMsg(!pl?'Running. Waiting for enough ticks to read the digit frequency.':`Running (${fbMode==='both'?'Auto':fbMode==='over'?'Over 0 only':'Under 9 only'}). 0 is ${pl.pct[0].toFixed(1)}% (${pl.j0.why}), 9 is ${pl.pct[9].toFixed(1)}% (${pl.j9.why}). Buys on: ${fbTriggers(pl)}.`,'ok');
+  fbRender();
+}
+function fbStop(why,cls){ if(FB.state!=='run') return; FB.state='stopped'; updateBuy(); fbMsg('Stopped: '+why,cls||''); fbRender(); }
+function fbTick(d){
+  if($('fbCard')&&!$('fbCard').hidden) fbRender();
+  if(FB.state!=='run'||roundOpen) return;
+  if(!ws||!account){ fbStop('connection lost','err'); return; }
+  if(d!==0&&d!==9) return;
+  const pl=fbPlan(); if(!pl) return;
+  const bet=fbBetFor(d,pl);
+  if(!bet){ const jd=d===0?pl.j0:pl.j9; if(jd.why!=='off in this mode'){ const key=d+':'+jd.why; if(FB.lastSkip!==key){ fbMsg(`Cursor hit ${d}, skipped: ${d} is ${pl.pct[d].toFixed(1)}% (${jd.why}).`); FB.lastSkip=key; } } return; }
+  FB.lastSkip=null;
+  const stake=num('fbStake'), count=parseInt($('fbCount').value,10), left=num('fbSL')+FB.pnl;
+  if(stake*count>left+1e-9){ fbStop(`only ${money(Math.max(left,0))} left before the stop loss, less than one ${money(stake*count)} round`,'err'); return; }
+  fbMsg(`Cursor hit ${d} (${pl.pct[d].toFixed(1)}%, not green): buying ${count} × ${money(stake)} ${bet.label}.`);
+  buyRound({src:'fixed',kind:bet.kind,digit:bet.digit,stake,count,brain:'AI Fixed Bet'});
+}
+function fbRoundDone(r){
+  if(FB.state!=='run') return;
+  FB.pnl=Math.round((FB.pnl+r.pnl)*100)/100; FB.rounds++; if(r.pnl>0) FB.wins++;
+  const tp=num('fbTP'), sl=num('fbSL');
+  if(FB.pnl>=tp){ fbStop(`take profit reached (${money(FB.pnl,true)} after ${FB.rounds} rounds)`,'ok'); return; }
+  if(FB.pnl<=-sl+1e-9){ fbStop(`stop loss reached (${money(FB.pnl,true)} after ${FB.rounds} rounds)`,'err'); return; }
+  fbMsg(`Round ${FB.rounds}: ${money(r.pnl,true)}. Total ${money(FB.pnl,true)}. Waiting for the next trigger.`, r.pnl>=0?'ok':'err');
+  fbRender();
+}
+fbSetMode(fbMode);
+$('fbStart').onclick=fbStart; $('fbStop').onclick=()=>fbStop('you pressed STOP');
+
+function showTab(t){ $('apCard').hidden=t!=='auto'; $('fbCard').hidden=t!=='fixed'; document.querySelector('.card.order').hidden=t!=='manual'; $('tabManual').setAttribute('aria-pressed',t==='manual'); $('tabAuto').setAttribute('aria-pressed',t==='auto'); $('tabFixed').setAttribute('aria-pressed',t==='fixed'); if(t==='fixed') fbRender(); }
+$('tabManual').onclick=()=>showTab('manual'); $('tabAuto').onclick=()=>showTab('auto'); $('tabFixed').onclick=()=>showTab('fixed');
+$('apStart').onclick=apStart;
+$('apStop').onclick=()=>apStop('you pressed STOP');
+$('apPause').onclick=()=>{ if(AP.state==='pause'){ AP.pauseUntil=0; AP.streak=0; apSetState('run'); apNote('Resumed by you.'); } else apPauseFor(0,'paused by you'); };
+document.querySelectorAll('#apCard input').forEach(i=>i.addEventListener('input',apRender));
+setInterval(()=>{ if(AP.state==='pause'||AP.state==='run') apRender(); else apRenderToday(); },1000);
+
+
+/* ---------- Repeats tracker + tick log ---------- */
+let repTicks=[], R, RH=null, repHist=null;
+const newRep=()=>({n:0,dbl:0,tri:0,a0:0,r0:0,a9:0,r9:0,c00:0,c99:0,c000:0,c999:0,p1:null,p2:null,gap:0,maxGap:0,sinceDbl:0});
+function repReset(){ repTicks=[]; R=newRep(); }
+repReset();
+function repAdd(epoch,q,sym){
+  const d=+q.slice(-1);
+  if(repTicks.length<200000) repTicks.push({epoch,q,d,sym});
+  repStat(R,d);
+}
+function repStat(R,d){
+  R.n++;
+  if(R.p1!==null){
+    if(R.p1===0){ R.a0++; if(d===0) R.r0++; }
+    if(R.p1===9){ R.a9++; if(d===9) R.r9++; }
+    if(d===R.p1){ R.dbl++; if(d===0) R.c00++; if(d===9) R.c99++; R.maxGap=Math.max(R.maxGap,R.sinceDbl); R.sinceDbl=0;
+      if(R.p2===d){ R.tri++; if(d===0) R.c000++; if(d===9) R.c999++; } }
+    else R.sinceDbl++;
+  }
+  R.p2=R.p1; R.p1=d;
+}
+function repVerdict(k,n,p,min){
+  if(n<min) return `<span class="st open" title="A verdict appears once there are enough chances">${n}/${min}</span>`;
+  const z=(k-n*p)/Math.sqrt(n*p*(1-p));
+  if(z>=2.5) return '<span class="st lost" title="Happening more often than chance">Above</span>';
+  if(z<=-2.5) return '<span class="st won" title="Happening less often than chance">Below</span>';
+  return '<span class="st open" title="Within normal random variation">Chance</span>';
+}
+function renderRepeats(){
+  if(!$('repRows')) return;
+  repDraw(RH||R);
+}
+function repDraw(R){
+  $('repN').textContent=R.n;
+  const pairs=Math.max(R.n-1,0), trips=Math.max(R.n-2,0);
+  const row=(name,k,n,p,min,title)=>`<tr title="${title}"><td style="font-family:var(--sans)"><b>${name}</b></td><td>${k}</td><td>${n}</td><td>${n?(k/n*100).toFixed(1)+'%':'–'} <span class="sym">(${+(p*100).toFixed(1)}%)</span></td><td>${repVerdict(k,n,p,min)}</td></tr>`;
+  $('repRows').innerHTML=
+    row('After 0 → 0',R.r0,R.a0,.1,300,'Out of every tick that followed a 0, how many were 0 again. This is the Over 0 losing case.')+
+    row('After 9 → 9',R.r9,R.a9,.1,300,'Out of every tick that followed a 9, how many were 9 again. This is the Under 9 losing case.')+
+    row('Any double',R.dbl,pairs,.1,500,'Any digit repeating the one before it.')+
+    row('Any triple',R.tri,trips,.01,2000,'Any digit three times in a row.')+
+    row('00',R.c00,pairs,.01,2000,'Two zeros in a row, anywhere.')+
+    row('99',R.c99,pairs,.01,2000,'Two nines in a row, anywhere.')+
+    row('000 / 999',R.c000+R.c999,trips,.002,5000,'Three zeros or three nines in a row.');
+  $('repGaps').innerHTML=`<span>Ticks since last double <b>${R.sinceDbl}</b></span><span>Longest gap between doubles <b>${Math.max(R.maxGap,R.sinceDbl)}</b></span><span>Average gap by chance <b>~9</b></span>`;
+}
+$('ticksCsv').onclick=()=>{
+  if(RH&&repHist){
+    const rows=[]; let prev=null;
+    repHist.rows.forEach(h=>{ for(let i=0;i<h.digits.length;i++){ const d=+h.digits[i]; rows.push([new Date((Number(h.first_epoch||h.hour_start)+i)*1000).toISOString(),h.market,d,prev===null?'':(prev===d?'Y':'N')]); prev=d; } });
+    downloadCsv(`stored-ticks-${repHist.market}-${repHist.hours}h-${stamp()}.csv`,['Approx. time','Market','Last digit','Repeat of previous'],rows);
+    showMsg(`Downloaded ${rows.length} stored ticks.`,'ok'); return;
+  }
+  if(!repTicks.length){ showMsg('No ticks collected yet. Connect first.','err'); return; }
+  let prev=null;
+  const rows=repTicks.map(t=>{ const r=[t.epoch?new Date(t.epoch*1000).toISOString():'',t.sym||'',t.q,t.d,prev===null?'':(prev===t.d?'Y':'N')]; prev=t.d; return r; });
+  downloadCsv(`ticks-${$('symbol').value}-${stamp()}.csv`,['Time','Market','Price','Last digit','Repeat of previous'],rows);
+  showMsg(`Downloaded ${repTicks.length} ticks.`,'ok');
+};
+
+
+/* ---------- Draggable column dividers (wide screens) ---------- */
+(function(){
+  const root=document.documentElement, lay=document.querySelector('.layout'), left=document.querySelector('.left');
+  const KEY='digitdesk:cols';
+  function apply(w){ if(w.a) root.style.setProperty('--wA',w.a+'px'); else root.style.removeProperty('--wA'); if(w.c) root.style.setProperty('--wC',w.c+'px'); else root.style.removeProperty('--wC'); }
+  let W={}; try{ W=JSON.parse(localStorage.getItem(KEY))||{}; }catch{} apply(W);
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(W)); }catch{} }
+  function fit(){ // keep widths inside the window so no sideways scroll ever appears
+    const lw=lay.getBoundingClientRect().width;
+    if(W.c) W.c=Math.max(340,Math.min(W.c,lw-760));
+    const leftW=lw-(W.c||420)-10;
+    const a=W.a||300; if(W.a||leftW-a<490) W.a=Math.max(240,Math.min(a,leftW-490));
+    apply(W);
+  }
+  function drag(el,onMove){
+    el.addEventListener('pointerdown',e=>{
+      e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('drag'); document.body.classList.add('resizing');
+      const mv=ev=>{ onMove(ev.clientX); fit(); moveCursor(hist.length?hist[hist.length-1]:null); };
+      const up=()=>{ el.classList.remove('drag'); document.body.classList.remove('resizing'); el.removeEventListener('pointermove',mv); el.removeEventListener('pointerup',up); save(); };
+      el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up);
+    });
+  }
+  drag($('splitA'),x=>{ W.a=Math.round(x-left.getBoundingClientRect().left-5); });
+  drag($('splitC'),x=>{ W.c=Math.round(lay.getBoundingClientRect().right-x-5); });
+  $('splitA').addEventListener('dblclick',()=>{ delete W.a; apply(W); save(); });
+  $('splitC').addEventListener('dblclick',()=>{ delete W.c; apply(W); save(); });
+  window.addEventListener('resize',fit); fit();
+})();
+
+$('labReset').onclick=labReset;
+function csvCell(v){ const s=String(v??''); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+function downloadCsv(name,header,rows){
+  const text=[header,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob(['﻿'+text],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+const stamp=()=>new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+$('tradesCsv').onclick=()=>{
+  const list=[...contracts.values()].sort((a,b)=>a.round-b.round||a.id-b.id);
+  if(!list.length){ showMsg('No trades to download yet.','err'); return; }
+  downloadCsv(`trades-${stamp()}.csv`,['Round','Time','Account','Market','Brain','Contract','Contract ID','Stake','Payout','Exit digit','Result','Profit'],
+    list.map(r=>[r.round,r.time.toISOString(),account?account.loginid:'',r.symbol||'',r.brain||'Manual',r.label,r.id,r.stake.toFixed(2),r.payout.toFixed(2),r.exit,r.status==='open'?'Open':r.status==='won'?'Won':'Lost',r.profit==null?'':r.profit.toFixed(2)]));
+  showMsg(`Downloaded ${list.length} trades.`,'ok');
+};
+$('labCsv').onclick=()=>{
+  if(!labLog.length){ showMsg('The lab has no predictions to download yet.','err'); return; }
+  downloadCsv(`ai-lab-${stamp()}.csv`,['Time','Market','Tick digit','Brain','Pick','Result','Paper P/L ($1)','Brain running P/L'],labLog);
+  showMsg(`Downloaded ${labLog.length} predictions.`,'ok');
+};
+/* ---------- DigitDesk cloud (Supabase): login, trade log, daily limit, stored tick history ----------
+   Only the public publishable key lives here. Row level security means each signed-in user can only
+   read and write their own trades and daily limits. The Deriv token never leaves this browser tab. */
+var CLOUD={url:'https://rirpyogbmnsxpfuqkrco.supabase.co',key:'sb_publishable_V-93DJ2G0Fv5b_4aMQ3vlQ_LpGtLy8z'};
+var SB=null, cloudUser=null, cloudSaved=0, cloudFailed=0;
+const QKEY='digitdesk:cloudQueue';
+function cloudMsg(t,cls){ const m=$('cloudMsg'); m.textContent=t||''; m.className='msg'+(cls?' '+cls:''); }
+function cloudRender(){
+  const p=$('cloudPill');
+  if(!SB){ p.className='pill warn'; $('cloudText').textContent='Cloud: unavailable'; $('cloudBtn').hidden=true; return; }
+  if(cloudUser){ p.className='pill on'; $('cloudText').textContent=`Cloud: ${cloudUser.email}`+(cloudSaved?` · ${cloudSaved} saved`:'')+(cloudFailed?` · ${cloudFailed} waiting`:''); $('cloudBtn').textContent='Sign out'; }
+  else { p.className='pill'; $('cloudText').textContent='Cloud: signed out'; $('cloudBtn').textContent='Sign in'; }
+}
+function qLoad(){ try{ return JSON.parse(localStorage.getItem(QKEY))||[]; }catch{ return []; } }
+function qSave(q){ try{ localStorage.setItem(QKEY,JSON.stringify(q.slice(-2000))); }catch{} }
+async function cloudFlush(){
+  if(!SB||!cloudUser) return;
+  const q=qLoad(); if(!q.length){ cloudFailed=0; cloudRender(); return; }
+  const { error }=await SB.from('trades').upsert(q,{onConflict:'user_id,contract_id',ignoreDuplicates:true});
+  if(!error){ cloudSaved+=q.length; qSave([]); cloudFailed=0; } else cloudFailed=q.length;
+  cloudRender();
+}
+function cloudTrade(row,r){
+  if(!account) return;
+  const src=r&&r.src==='fixed'?'fixed':r&&r.ap?'autopilot':'manual';
+  const rec={contract_id:Number(row.id),account:account.loginid,market:row.symbol||null,source:src,brain:row.brain||null,contract:row.label||null,round:row.round,
+    stake:row.stake,payout:row.payout,exit_digit:row.exit!==''&&row.exit!=null&&!isNaN(+row.exit)?+row.exit:null,result:row.status==='won'||row.status==='lost'?row.status:null,profit:row.profit,traded_at:(row.time||new Date()).toISOString()};
+  const q=qLoad(); q.push(rec); qSave(q);
+  if(!cloudUser){ return; }
+  clearTimeout(cloudTrade.t); cloudTrade.t=setTimeout(cloudFlush,800); // batch a bulk round into one write
+}
+function dayRow(d){ return {account:account.loginid,day:new Date().toLocaleDateString('en-CA'),pnl:d.pnl,sessions:d.sessions,lock_until:d.lockUntil?new Date(d.lockUntil).toISOString():null,lock_why:d.lockWhy||null,updated_at:new Date().toISOString()}; }
+function cloudDayPush(d){
+  if(!SB||!cloudUser||!account) return;
+  SB.from('daily_limits').upsert(dayRow(d),{onConflict:'user_id,account,day'}).then(({error})=>{ if(error) console.warn('daily limit sync',error.message); });
+}
+async function cloudDayPull(){
+  if(!SB||!cloudUser||!account) return;
+  const { data, error }=await SB.from('daily_limits').select('*').eq('account',account.loginid).eq('day',new Date().toLocaleDateString('en-CA')).maybeSingle();
+  if(error) return;
+  const local=loadDay();
+  if(data){ // keep whichever side is stricter, so a second device cannot reset the limit
+    const merged={pnl:Math.min(local.pnl,Number(data.pnl)),sessions:Math.max(local.sessions,data.sessions),lockUntil:Math.max(local.lockUntil||0,data.lock_until?Date.parse(data.lock_until):0),lockWhy:local.lockWhy||data.lock_why||''};
+    if(merged.lockUntil===(data.lock_until?Date.parse(data.lock_until):0)&&data.lock_why) merged.lockWhy=data.lock_why;
+    saveDay(merged);
+  } else if(local.pnl||local.sessions||local.lockUntil) cloudDayPush(local);
+  if(typeof apRender==='function') apRender();
+}
+async function cloudSetUser(u){
+  const was=cloudUser&&cloudUser.id; cloudUser=u||null; cloudRender();
+  if(cloudUser&&cloudUser.id!==was){ cloudFlush(); cloudDayPull(); }
+  if(!cloudUser&&RH){ $('repSrc').value='live'; repSource(); }
+}
+async function cloudAuth(kind){
+  const email=$('cloudEmail').value.trim(), password=$('cloudPass').value;
+  if(!email||password.length<8){ cloudMsg('Enter your email and a password of at least 8 characters.','err'); return; }
+  cloudMsg(kind==='up'?'Creating your account…':'Signing in…');
+  try{
+    if(kind==='up'){
+      const { data, error }=await SB.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});
+      if(error) throw error;
+      if(!data.session){ cloudMsg('Account created. Check your email and click the confirmation link, then come back and press Sign in.','ok'); return; }
+    } else {
+      const { error }=await SB.auth.signInWithPassword({email,password});
+      if(error) throw error;
+    }
+    $('cloudPass').value=''; cloudMsg(''); $('cloudBox').hidden=true;
+  }catch(e){ cloudMsg(/confirm/i.test(e.message)?'Your email is not confirmed yet. Open the confirmation email first.':/invalid login/i.test(e.message)?'Wrong email or password.':e.message,'err'); }
+}
+async function repSource(){
+  const v=$('repSrc').value;
+  if(v==='live'){ RH=null; repHist=null; $('repWhat').textContent='Counts doubles and triples in every tick collected on this market'; renderRepeats(); return; }
+  const market=$('symbol').value;
+  if(!cloudUser){ $('repSrc').value='live'; showMsg('Sign in to the DigitDesk cloud (top right) to analyse stored ticks.','err'); return; }
+  if(market!=='1HZ100V'&&market!=='1HZ10V'){ $('repSrc').value='live'; showMsg('Stored history is collected for Volatility 10 (1s) and Volatility 100 (1s). Switch to one of those markets.','err'); return; }
+  const hours=+v, since=Math.floor(Date.now()/3600000)*3600-hours*3600;
+  $('repWhat').textContent=`Loading stored ticks for the last ${hours} h…`;
+  const { data, error }=await SB.from('tick_hours').select('market,hour_start,digits,n,first_epoch').eq('market',market).gte('hour_start',since).order('hour_start',{ascending:true}).limit(1000);
+  if(error){ $('repSrc').value='live'; RH=null; showMsg('Could not load stored ticks: '+error.message,'err'); repSource(); return; }
+  const S=newRep(); let prevEnd=null;
+  (data||[]).forEach(h=>{ if(prevEnd!==null&&Number(h.hour_start)!==prevEnd){ S.p1=null; S.p2=null; } for(const c of h.digits) repStat(S,+c); prevEnd=Number(h.hour_start)+3600; });
+  RH=S; repHist={market,hours,rows:data||[]};
+  $('repWhat').textContent=`Stored history: ${market==='1HZ100V'?'Vol 100 (1s)':'Vol 10 (1s)'}, ${(data||[]).length} full hours`;
+  renderRepeats();
+}
+$('repSrc').onchange=repSource;
+['symbol','apSymbol','fbSymbol'].forEach(id=>$(id).addEventListener('change',()=>{ if(RH) repSource(); }));
+$('cloudBtn').onclick=async()=>{ if(cloudUser){ await SB.auth.signOut(); return; } $('cloudBox').hidden=!$('cloudBox').hidden; if(!$('cloudBox').hidden) $('cloudEmail').focus(); };
+$('cloudClose').onclick=()=>{ $('cloudBox').hidden=true; };
+$('cloudIn').onclick=()=>cloudAuth('in');
+$('cloudUp').onclick=()=>cloudAuth('up');
+$('cloudPass').addEventListener('keydown',e=>{ if(e.key==='Enter') cloudAuth('in'); });
+try{
+  if(window.supabase&&window.supabase.createClient){
+    SB=window.supabase.createClient(CLOUD.url,CLOUD.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'digitdesk-auth'}});
+    SB.auth.onAuthStateChange((_ev,sess)=>{ setTimeout(()=>cloudSetUser(sess&&sess.user),0); });
+    SB.auth.getSession().then(({data})=>cloudSetUser(data.session&&data.session.user));
+  }
+}catch(e){ console.warn('cloud unavailable',e); SB=null; }
+cloudRender();
+
+labReset(); resetSession(); renderSummary(); renderFreq(); renderRepeats(); apSetState('off');
+</script>
+</body>
+</html>
