@@ -349,6 +349,18 @@ tr.newround td{border-top:2px solid var(--line)}
         <p class="freqnote" id="freqNote">Connect to load recent ticks.</p>
       </section>
       <section class="card">
+        <div class="freqhead"><h2>Repeats</h2><div class="repsrc"><select id="repSrc" title="Count live ticks from this session, or the hourly history saved in the cloud (Vol 10 (1s) and Vol 100 (1s) only; sign in first)"><option value="live">Live ticks</option><option value="6">Stored · last 6 h</option><option value="24">Stored · last 24 h</option><option value="72">Stored · last 3 days</option><option value="168">Stored · last 7 days</option></select><button id="ticksCsv" style="padding:6px 12px;font-size:13px">Download ticks CSV</button></div></div>
+        <p class="hint" style="margin-bottom:8px"><span id="repWhat">Counts doubles and triples in every tick collected on this market</span> (<b id="repN">0</b> ticks). "After 0 → 0" is exactly when an Over 0 bought on a 0 would lose; "After 9 → 9" is when an Under 9 bought on a 9 would lose.</p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Pattern</th><th>Seen</th><th>Out of</th><th>Rate (chance)</th><th>Verdict</th></tr></thead>
+            <tbody id="repRows"></tbody>
+          </table>
+        </div>
+        <div class="apstats" id="repGaps"></div>
+      </section>
+
+      <section class="card">
         <div class="freqhead">
           <h2>AI test lab</h2>
           <div class="seg" id="labSeg" role="group" aria-label="Ticks the brains learn from">
@@ -364,18 +376,6 @@ tr.newround td{border-top:2px solid var(--line)}
         </div>
         <div class="stopline"><span id="labStatus" class="hint">Connect to start the brains.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button id="labCsv">Download CSV</button><button id="labReset">Reset lab</button></span></div>
         <p class="freqnote" id="payNote"></p>
-      </section>
-
-      <section class="card">
-        <div class="freqhead"><h2>Repeats</h2><div class="repsrc"><select id="repSrc" title="Count live ticks from this session, or the hourly history saved in the cloud (Vol 10 (1s) and Vol 100 (1s) only; sign in first)"><option value="live">Live ticks</option><option value="6">Stored · last 6 h</option><option value="24">Stored · last 24 h</option><option value="72">Stored · last 3 days</option><option value="168">Stored · last 7 days</option></select><button id="ticksCsv" style="padding:6px 12px;font-size:13px">Download ticks CSV</button></div></div>
-        <p class="hint" style="margin-bottom:8px"><span id="repWhat">Counts doubles and triples in every tick collected on this market</span> (<b id="repN">0</b> ticks). "After 0 → 0" is exactly when an Over 0 bought on a 0 would lose; "After 9 → 9" is when an Under 9 bought on a 9 would lose.</p>
-        <div class="tablewrap">
-          <table>
-            <thead><tr><th>Pattern</th><th>Seen</th><th>Out of</th><th>Rate (chance)</th><th>Verdict</th></tr></thead>
-            <tbody id="repRows"></tbody>
-          </table>
-        </div>
-        <div class="apstats" id="repGaps"></div>
       </section>
       </div>
     </div>
