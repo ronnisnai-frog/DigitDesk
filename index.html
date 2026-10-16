@@ -284,7 +284,8 @@ tr.newround td{border-top:2px solid var(--line)}
             <div class="field"><label for="fbTP">Take profit</label><input id="fbTP" type="number" min="0.1" step="0.5" value="4"></div>
             <div class="field"><label for="fbSL">Stop loss</label><input id="fbSL" type="number" min="0.35" step="0.5" value="6"></div>
           </div>
-          <p class="hint" style="margin-top:6px">1 tick per contract. Uses the Digit frequency window you've selected (currently <b id="fbN">1000</b> ticks). Demo account only.</p>
+          <p class="hint" style="margin-top:6px">1 tick per contract. Uses the Digit frequency window you've selected (currently <b id="fbN">1000</b> ticks). Runs on demo freely; real money needs the box below.</p>
+          <label class="chk" style="margin-top:4px"><input type="checkbox" id="fbReal"> Allow real money (caps: $1 per contract, 6 contracts, $6 stop loss per session, $18 real loss per day)</label>
           <div class="apbtns" style="grid-template-columns:2fr 1fr"><button class="primary" id="fbStart">Start AI Fixed Bet</button><button class="stop" id="fbStop" disabled>STOP</button></div>
           <p class="msg" id="fbMsg" role="status"></p>
           <div class="apstats" id="fbStats"></div>
@@ -1115,6 +1116,7 @@ function apBuyFailed(msg){ if(AP.state==='run') apPauseFor(30,'Deriv rejected th
 var FB={state:'off',pnl:0,rounds:0,wins:0,red:null,mode:null};
 function fbMsg(t,cls){ const m=$('fbMsg'); m.textContent=t||''; m.className='msg'+(cls?' '+cls:''); }
 const FB_LIMIT=10.0;
+const FB_REAL={stake:1,count:6,sl:6,daily:18}; // hard caps on real-money accounts
 /* Reads Digit frequency exactly as shown (1 decimal) and judges 0 and 9 separately */
 function fbPlan(){
   const sample=hist.slice(-freqN); if(sample.length<50) return null;
@@ -1168,13 +1170,23 @@ function fbRender(){
   $('fbStart').disabled=FB.state==='run'; $('fbStop').disabled=FB.state!=='run';
   ['fbStake','fbCount','fbTP','fbSL'].forEach(id=>$(id).disabled=FB.state==='run');
   document.querySelectorAll('#fbModeSeg button').forEach(b=>b.disabled=FB.state==='run');
-  $('fbOverride').disabled=FB.state==='run';
+  $('fbOverride').disabled=FB.state==='run'; $('fbReal').disabled=FB.state==='run';
   ['symbol','apSymbol','fbSymbol'].forEach(id=>$(id).disabled=FB.state==='run'||AP.state==='run'||AP.state==='pause');
   $('fbStats').innerHTML=FB.state==='off'?'':`<span>P/L <b class="${FB.pnl>=0?'pos':'neg'}">${money(FB.pnl,true)}</b></span><span>Rounds <b>${FB.rounds}</b></span><span>Won <b>${FB.wins}</b></span><span>Left before stop loss <b>${money(Math.max(num('fbSL')+FB.pnl,0))}</b></span>`;
 }
 function fbStart(){
   if(!ws||!account){ fbMsg('Connect first.','err'); return; }
-  if(!account.is_virtual){ fbMsg('AI Fixed Bet only runs on a demo account for now. Switch to your demo account.','err'); return; }
+  const real=!account.is_virtual;
+  if(real){
+    if(!$('realOk').checked){ fbMsg('Tick the real-money confirmation at the top first.','err'); return; }
+    if(!$('fbReal').checked){ fbMsg('This is a real-money account. Tick "Allow real money" to run AI Fixed Bet here.','err'); return; }
+    const s=num('fbStake'), c=parseInt($('fbCount').value,10), l=num('fbSL');
+    if(s>FB_REAL.stake||c>FB_REAL.count||l>FB_REAL.sl){ fbMsg(`Real-money caps: at most ${money(FB_REAL.stake)} per contract, ${FB_REAL.count} contracts and a ${money(FB_REAL.sl)} stop loss. Lower your settings.`,'err'); return; }
+    const d=loadDay(), lost=-(d.fbReal||0);
+    if(lost>=FB_REAL.daily-1e-9){ fbMsg(`Daily real-money loss limit reached (${money(lost)} of ${money(FB_REAL.daily)}). AI Fixed Bet is locked on this account until midnight.`,'err'); return; }
+    if(lost+l>FB_REAL.daily+1e-9){ fbMsg(`Only ${money(FB_REAL.daily-lost)} of today's ${money(FB_REAL.daily)} real-money loss limit is left. Lower the stop loss to that or less.`,'err'); return; }
+    if(!confirm(`REAL MONEY on ${account.loginid}.\n\nAI Fixed Bet will buy ${c} × ${money(s)} contracts by itself and can lose up to ${money(l)} this session.\n\nStart?`)) { fbMsg('Cancelled.'); return; }
+  }
   if(AP.state==='run'||AP.state==='pause'){ fbMsg('Stop Autopilot first.','err'); return; }
   if(roundOpen){ fbMsg('Wait for the open round to finish.','err'); return; }
   const stake=num('fbStake'), count=parseInt($('fbCount').value,10), tp=num('fbTP'), sl=num('fbSL');
@@ -1205,6 +1217,10 @@ function fbRoundDone(r){
   if(FB.state!=='run') return;
   FB.pnl=Math.round((FB.pnl+r.pnl)*100)/100; FB.rounds++; if(r.pnl>0) FB.wins++;
   const tp=num('fbTP'), sl=num('fbSL');
+  if(account&&!account.is_virtual){
+    const d=loadDay(); d.fbReal=Math.round(((d.fbReal||0)+r.pnl)*100)/100; saveDay(d);
+    if(-d.fbReal>=FB_REAL.daily-1e-9){ fbStop(`daily real-money loss limit reached (${money(-d.fbReal)} today). Locked until midnight`,'err'); return; }
+  }
   if(FB.pnl>=tp){ fbStop(`take profit reached (${money(FB.pnl,true)} after ${FB.rounds} rounds)`,'ok'); return; }
   if(FB.pnl<=-sl+1e-9){ fbStop(`stop loss reached (${money(FB.pnl,true)} after ${FB.rounds} rounds)`,'err'); return; }
   fbMsg(`Round ${FB.rounds}: ${money(r.pnl,true)}. Total ${money(FB.pnl,true)}. Waiting for the next trigger.`, r.pnl>=0?'ok':'err');
