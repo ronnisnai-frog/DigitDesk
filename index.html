@@ -271,7 +271,8 @@ tr.newround td{border-top:2px solid var(--line)}
           <div class="field" style="margin-bottom:10px"><label>Bets to place</label>
             <div class="seg tabs" id="fbModeSeg" role="group" aria-label="Bets to place"><button data-m="both" aria-pressed="true">Auto</button><button data-m="over" aria-pressed="false">Over 0 only</button><button data-m="under" aria-pressed="false">Under 9 only</button></div>
           </div>
-          <div class="fbrule"><div id="fbRuleText"></div><div>A digit is only traded while its frequency is <b>10.0% or below</b> (blocked at 10.1%+) and it is <b>not the green ring</b>. Each digit is judged on its own.</div></div>
+          <div class="fbrule"><div id="fbRuleText"></div><div>A digit is only traded while its frequency is <b>10.0% or below</b> (blocked at 10.1%+) and it is <b>not the green ring</b>. Each digit is judged on its own.</div>
+            <label style="display:flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer"><input type="checkbox" id="fbOverride"> <span>Override the 10% rule <span class="sym">(trade 0 and 9 at any %; the green ring rule still applies)</span></span></label></div>
           <div class="fblive">
             <div><span class="k">Digit 0</span><span class="v" id="fbD0">–</span><span class="fbwhy" id="fbW0"></span></div>
             <div><span class="k">Digit 9</span><span class="v" id="fbD9">–</span><span class="fbwhy" id="fbW9"></span></div>
@@ -1124,13 +1125,20 @@ function fbPlan(){
     const want=d===0?fbMode!=='under':fbMode!=='over';
     if(!want) return {ok:false,why:'off in this mode'};
     if(greens.includes(d)) return {ok:false,why:'green ring'};
-    if(pct[d]>FB_LIMIT) return {ok:false,why:`above ${FB_LIMIT.toFixed(1)}%`};
-    return {ok:true,why:'ready'};
+    if(pct[d]>FB_LIMIT&&!fbOverride) return {ok:false,why:`above ${FB_LIMIT.toFixed(1)}%`};
+    return {ok:true,why:pct[d]>FB_LIMIT?'ready (10% rule overridden)':'ready'};
   };
   return {greens,pct,j0:judge(0),j9:judge(9)};
 }
-let fbMode='both';
-try{ fbMode=localStorage.getItem('digitdesk:fbMode')||'both'; }catch{}
+let fbMode='both', fbOverride=false;
+try{ fbMode=localStorage.getItem('digitdesk:fbMode')||'both'; fbOverride=localStorage.getItem('digitdesk:fbOverride')==='1'; }catch{}
+$('fbOverride').checked=fbOverride;
+$('fbOverride').onchange=e=>{
+  if(FB.state==='run'){ e.target.checked=fbOverride; fbMsg('Stop AI Fixed Bet before changing the 10% rule.','err'); return; }
+  fbOverride=e.target.checked; try{ localStorage.setItem('digitdesk:fbOverride',fbOverride?'1':'0'); }catch{}
+  fbMsg(fbOverride?'10% rule overridden: 0 and 9 will be traded at any frequency, except when they are the green ring.':'10% rule back on.', fbOverride?'err':'ok');
+  fbRender();
+};
 function fbBetFor(d,pl){
   if(!pl) return null;
   if(d===0&&pl.j0.ok) return {kind:'over',digit:0,label:'Over 0'};
@@ -1160,6 +1168,7 @@ function fbRender(){
   $('fbStart').disabled=FB.state==='run'; $('fbStop').disabled=FB.state!=='run';
   ['fbStake','fbCount','fbTP','fbSL'].forEach(id=>$(id).disabled=FB.state==='run');
   document.querySelectorAll('#fbModeSeg button').forEach(b=>b.disabled=FB.state==='run');
+  $('fbOverride').disabled=FB.state==='run';
   ['symbol','apSymbol','fbSymbol'].forEach(id=>$(id).disabled=FB.state==='run'||AP.state==='run'||AP.state==='pause');
   $('fbStats').innerHTML=FB.state==='off'?'':`<span>P/L <b class="${FB.pnl>=0?'pos':'neg'}">${money(FB.pnl,true)}</b></span><span>Rounds <b>${FB.rounds}</b></span><span>Won <b>${FB.wins}</b></span><span>Left before stop loss <b>${money(Math.max(num('fbSL')+FB.pnl,0))}</b></span>`;
 }
@@ -1174,7 +1183,7 @@ function fbStart(){
   followId=null; renderLab();
   Object.assign(FB,{state:'run',pnl:0,rounds:0,wins:0}); updateBuy();
   const pl=fbPlan();
-  fbMsg(!pl?'Running. Waiting for enough ticks to read the digit frequency.':`Running (${fbMode==='both'?'Auto':fbMode==='over'?'Over 0 only':'Under 9 only'}). 0 is ${pl.pct[0].toFixed(1)}% (${pl.j0.why}), 9 is ${pl.pct[9].toFixed(1)}% (${pl.j9.why}). Buys on: ${fbTriggers(pl)}.`,'ok');
+  fbMsg(!pl?'Running. Waiting for enough ticks to read the digit frequency.':`Running (${fbMode==='both'?'Auto':fbMode==='over'?'Over 0 only':'Under 9 only'}${fbOverride?', 10% rule OFF':''}). 0 is ${pl.pct[0].toFixed(1)}% (${pl.j0.why}), 9 is ${pl.pct[9].toFixed(1)}% (${pl.j9.why}). Buys on: ${fbTriggers(pl)}.`,'ok');
   fbRender();
 }
 function fbStop(why,cls){ if(FB.state!=='run') return; FB.state='stopped'; updateBuy(); fbMsg('Stopped: '+why,cls||''); fbRender(); }
@@ -1190,7 +1199,7 @@ function fbTick(d){
   const stake=num('fbStake'), count=parseInt($('fbCount').value,10), left=num('fbSL')+FB.pnl;
   if(stake*count>left+1e-9){ fbStop(`only ${money(Math.max(left,0))} left before the stop loss, less than one ${money(stake*count)} round`,'err'); return; }
   fbMsg(`Cursor hit ${d} (${pl.pct[d].toFixed(1)}%, not green): buying ${count} × ${money(stake)} ${bet.label}.`);
-  buyRound({src:'fixed',kind:bet.kind,digit:bet.digit,stake,count,brain:'AI Fixed Bet'});
+  buyRound({src:'fixed',kind:bet.kind,digit:bet.digit,stake,count,brain:'AI Fixed Bet'+(fbOverride?' (10% off)':'')});
 }
 function fbRoundDone(r){
   if(FB.state!=='run') return;
